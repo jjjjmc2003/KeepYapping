@@ -10,8 +10,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Custom Role Map
 const emailToRole = {
-    "ceo@example.com" : "CEO"
-    /*
+    "ceo@example.com" : "CEO",
     "volunteer@example.com": "Volunteer",
     "boardmember@example.com": "Board Member",
     "reptile-caregiver@example.com": "Caregiver",
@@ -24,7 +23,6 @@ const emailToRole = {
     "wildlife-caregiver@nsae.com": "Caregiver",
     "mamal-caregiver@nase.com": "Caregiver",
     "other-caregiver@nase.com": "Caregiver"
-    */
 };
 function getRoleByEmail(email) {
   return emailToRole[email] || "Volunteer";
@@ -63,8 +61,7 @@ export default function ChatApp() {
 
   // Predefined caregivers
   const predefinedEmails = [
-    "ceo@example.com"
-    /*
+    "ceo@example.com",
     "volunteer@example.com",
     "boardmember@example.com",
     "reptile-caregiver@example.com",
@@ -77,7 +74,6 @@ export default function ChatApp() {
     "wildlife-caregiver@nsae.com",
     "mamal-caregiver@nase.com",
     "other-caregiver@nase.com"
-    */
   ];
 
  //sets the user email and fetches all users
@@ -117,7 +113,7 @@ export default function ChatApp() {
   async function fetchMessages() {
     if (!userEmail) return;
 
-    let query = supabase.from("baseball_messages").select("*");
+    let query = supabase.from("messages").select("*");
     // Filter based on chat mode
     if (chatMode === "group") {
       query = query.eq("type", "group").eq("recipient", "group");
@@ -149,7 +145,9 @@ export default function ChatApp() {
       return;
     }
     const fetched = data || [];
+    console.log("Fetched messages:", data); // Debugging log
     setMessages(fetched);
+    
 
     // Mark them as read
     if (fetched.length > 0) {
@@ -202,7 +200,7 @@ export default function ChatApp() {
     }
 
     setNewMessage("");
-    const { error } = await supabase.from("baseball_messages").insert([messageData]);
+    const { error } = await supabase.from("messages").insert([messageData]);
     if (error) {
       console.error("Error sending message:", error);
       return;
@@ -219,8 +217,9 @@ export default function ChatApp() {
       .channel("messages-channel")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "baseball_messages" },
+        { event: "*", schema: "public", table: "messages" },
         (payload) => {
+          console.log("New message payload:", payload); // Debugging log
           const newMsg = payload.new;
           if (newMsg && newMsg.sender !== userEmail) {
             let note = "";
@@ -326,7 +325,7 @@ export default function ChatApp() {
       recipient: groupString,
     };
 
-    const { error } = await supabase.from("baseball_messages").insert([messageData]);
+    const { error } = await supabase.from("messages").insert([messageData]);
     if (error) {
       console.error("Error creating group chat:", error);
       return;
@@ -342,7 +341,7 @@ export default function ChatApp() {
   async function fetchPrivateGroups() {
     if (!userEmail) return;
     const { data, error } = await supabase
-      .from("baseball_messages")
+      .from("messages")
       .select("recipient")
       .eq("type", "multi_group");
     if (error) {
