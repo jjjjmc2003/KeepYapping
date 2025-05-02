@@ -51,7 +51,7 @@ function Login({ onLogin }) {
         <div style={{ marginBottom: "10px" }}>
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Password CHAAAASSSEEEE"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
