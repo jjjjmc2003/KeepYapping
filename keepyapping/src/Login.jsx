@@ -36,34 +36,18 @@ function Login({ onLogin }) {
         return;
       }
 
+      // Check if the user exists in the 'users' table (don't insert if they exist)
       const { data: existingUser, error: selectError } = await supabase
         .from("users")
         .select("*")
         .eq("email", email)
         .single();
 
-        if (selectError && selectError.code !== "PGRST116") {
+      if (selectError && selectError.code !== "PGRST116") {
+        console.error("Error fetching user:", selectError);
         setError("Error checking registration status.");
         return;
-        }
-
-        if (!existingUser) {
-        // Insert default values for missing user
-        const { error: insertError } = await supabase.from("users").insert([
-            {
-            email,
-            name: "",         // Default empty or fetch from elsewhere
-            bio: "",
-            displayname: "",  // You could later require user to update it
-            },
-        ]);
-
-        if (insertError) {
-            setError(`Failed to register user info: ${insertError.message}`);
-            return;
-        }
-        }
-
+      }
 
       // Everything is good, set the logged-in user and redirect
       setError("");

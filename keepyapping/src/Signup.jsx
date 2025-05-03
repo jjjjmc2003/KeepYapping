@@ -18,79 +18,82 @@ function Signup() {
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    setError("");
-  
+
+    // Basic validation
     if (!name || !bio || !email || !displayname || !password) {
       setError("All fields are required.");
       return;
     }
-  
+
     try {
-      // Step 1: Check if the email already exists
-      const { data: existingEmail } = await supabase
+      // Step 1: Check if the email already exists in the users table
+      const { data: existingEmail, error: emailCheckError } = await supabase
         .from("users")
         .select("email")
         .eq("email", email)
         .single();
-  
+
+      if (emailCheckError && emailCheckError.code !== "PGRST116") {
+        setError(`Error checking email: ${emailCheckError.message}`);
+        return;
+      }
+
       if (existingEmail) {
         setError("This email is already associated with an account.");
         return;
       }
-  
-      // Step 2: Check if displayname already exists
-      const { data: existingDisplayname } = await supabase
+
+      // Step 2: Check if the displayname already exists in the users table
+      const { data: existingDisplayname, error: displaynameCheckError } = await supabase
         .from("users")
         .select("displayname")
         .eq("displayname", displayname)
         .single();
-  
-      if (existingDisplayname) {
-        setError("This display name is already taken.");
+
+      if (displaynameCheckError && displaynameCheckError.code !== "PGRST116") {
+        setError(`Error checking display name: ${displaynameCheckError.message}`);
         return;
       }
-  
-      // Step 3: Sign up the user
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+
+      if (existingDisplayname) {
+        setError("This display name is already taken. Please choose another one.");
+        return;
+      }
+
+      // Step 3: Create the user in Supabase Auth
+      const { user, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
-  
+
       if (signUpError) {
         setError(`Sign-up failed: ${signUpError.message}`);
         return;
       }
-  
-      // Step 4: Wait until the session is active
-      const { data: sessionData } = await supabase.auth.getSession();
-  
-      if (!sessionData.session) {
-        setError("Could not establish session. Please check your email for a confirmation link.");
+
+      // Step 4: Insert the user details into the 'users' table
+      const { error: insertError } = await supabase.from("users").insert([
+        {
+          email: email,
+          name: name,
+          bio: bio,
+          displayname: displayname,
+          password: password, // Note: Don't store plain-text passwords in production
+        },
+      ]);
+
+      if (insertError) {
+        setError(`Failed to save user info: ${insertError.message}`);
         return;
       }
-  
-      // Step 5: Insert user data into 'users' table
-      //const { error: insertError } = await supabase.from("users").insert([
-        //{
-          //email,
-          //name,
-          //bio,
-          //displayname,
-        //},
-      //]);
-  
-      //if (insertError) {
-        //setError(`Failed to save user info: ${insertError.message}`);
-        //return;
-      //}
-  
-      // Success
+
+      // Step 5: Redirect user after successful signup
+      setError(""); // Clear any previous errors
       navigate("/login");
-    } catch (err) {
-      setError(`Unexpected error: ${err.message}`);
+    } catch (error) {
+      setError(`Unexpected error: ${error.message}`);
     }
   };
-  
 
   return (
     <div style={{ maxWidth: "400px", margin: "50px auto", textAlign: "center" }}>
