@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import "../styles/ChatApp.css"; // Import the CSS file
+import FriendRequests from "./FriendRequests";
 
 // Supabase Setup
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
@@ -58,6 +59,7 @@ export default function ChatApp() {
   // Combined list of all possible user emails
   const [allPossibleUsers, setAllPossibleUsers] = useState([]);
   const [notification, setNotification] = useState(null);
+  
 
   // Predefined caregivers
   const predefinedEmails = [
@@ -427,6 +429,7 @@ export default function ChatApp() {
           {newMessageNotification}
         </div>
       )}
+      <FriendRequests userEmail={userEmail} />
 
       <h3>
         {chatMode === "group"
