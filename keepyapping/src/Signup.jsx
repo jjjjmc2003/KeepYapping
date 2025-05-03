@@ -69,11 +69,20 @@ function Signup() {
         return;
       }
   
+      // Step 5: Insert user data into 'users' table
+      //const { error: insertError } = await supabase.from("users").insert([
+        //{
+          //email,
+          //name,
+          //bio,
+          //displayname,
+        //},
+      //]);
   
-      if (insertError) {
-        setError(`Failed to save user info: ${insertError.message}`);
-        return;
-      }
+      //if (insertError) {
+        //setError(`Failed to save user info: ${insertError.message}`);
+        //return;
+      //}
   
       // Success
       navigate("/login");
