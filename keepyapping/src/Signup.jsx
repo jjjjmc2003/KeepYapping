@@ -62,12 +62,12 @@ function Signup() {
       }
   
       // Step 4: Wait until the session is active
-      //const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await supabase.auth.getSession();
   
-      //if (!sessionData.session) {
-        //setError("Could not establish session. Please check your email for a confirmation link.");
-        //return;
-      //}
+      if (!sessionData.session) {
+        setError("Could not establish session. Please check your email for a confirmation link.");
+        return;
+      }
   
       // Step 5: Insert user data into 'users' table
       const { error: insertError } = await supabase.from("users").insert([
