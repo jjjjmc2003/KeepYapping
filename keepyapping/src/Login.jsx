@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Import useNavigate
 import React, { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,27 +11,53 @@ function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const navigate = useNavigate(); // Hook to navigate to a different page
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
 
-    if (error) {
-      setError("Login failed. Please check your credentials.");
-      console.error("Login error:", error);
-    } else {
-      setError("");
-      if (data.user && !data.user.confirmed_at) {
-        setError(
-          "Your account is not verified. Please check your email to verify your account before logging in."
-        );
-      } else {
-        console.log("Login successful:", data);
-        if (onLogin) onLogin(data.user); // Pass the user info to the parent component
+    try {
+      // Login request
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError("Login failed. Please check your credentials and verify your account.");
+        return;
       }
+
+      const { user } = data;
+
+      // Ensure email is verified
+      if (!user?.email_confirmed_at) {
+        setError("Your account is not verified. Please check your email.");
+        return;
+      }
+
+      // Check if the user exists in the 'users' table (don't insert if they exist)
+      const { data: existingUser, error: selectError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .single();
+
+      if (selectError && selectError.code !== "PGRST116") {
+        console.error("Error fetching user:", selectError);
+        setError("Error checking registration status.");
+        return;
+      }
+
+      // Everything is good, set the logged-in user and redirect
+      setError("");
+      if (onLogin) onLogin(user);
+      
+      // Redirect to the homepage/dashboard
+      navigate("/dashboard");  // Adjust this URL to your preferred redirect page
+
+    } catch (error) {
+      setError(`Unexpected error: ${error.message}`);
     }
   };
 
@@ -51,7 +77,7 @@ function Login({ onLogin }) {
         <div style={{ marginBottom: "10px" }}>
           <input
             type="password"
-            placeholder="Password CHAAAASSSEEEE"
+            placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={{ width: "100%", padding: "10px", marginBottom: "10px" }}

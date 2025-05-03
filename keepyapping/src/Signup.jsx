@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
+import { useNavigate } from "react-router-dom";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -8,44 +8,129 @@ const SUPABASE_ANON_KEY =
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function Signup() {
+  const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
   const [email, setEmail] = useState("");
+  const [displayname, setDisplayname] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
 
-    if (error) {
-      setError("Signup failed. Please try again.");
-      console.error("Signup error:", error);
-    } else {
-      setError("");
-      if (data.user && !data.user.confirmed_at) {
-        setSuccess(
-          "Signup successful! Please check your email to verify your account."
-        );
-      } else {
-        setSuccess("Signup successful! You can now log in.");
+    // Basic validation
+    if (!name || !bio || !email || !displayname || !password) {
+      setError("All fields are required.");
+      return;
+    }
+
+    try {
+      // Step 1: Check if the email already exists in the users table
+      const { data: existingEmail, error: emailCheckError } = await supabase
+        .from("users")
+        .select("email")
+        .eq("email", email)
+        .single();
+
+      if (emailCheckError && emailCheckError.code !== "PGRST116") {
+        setError(`Error checking email: ${emailCheckError.message}`);
+        return;
       }
-      console.log("Signup successful:", data);
+
+      if (existingEmail) {
+        setError("This email is already associated with an account.");
+        return;
+      }
+
+      // Step 2: Check if the displayname already exists in the users table
+      const { data: existingDisplayname, error: displaynameCheckError } = await supabase
+        .from("users")
+        .select("displayname")
+        .eq("displayname", displayname)
+        .single();
+
+      if (displaynameCheckError && displaynameCheckError.code !== "PGRST116") {
+        setError(`Error checking display name: ${displaynameCheckError.message}`);
+        return;
+      }
+
+      if (existingDisplayname) {
+        setError("This display name is already taken. Please choose another one.");
+        return;
+      }
+
+      // Step 3: Create the user in Supabase Auth
+      const { user, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (signUpError) {
+        setError(`Sign-up failed: ${signUpError.message}`);
+        return;
+      }
+
+      // Step 4: Insert the user details into the 'users' table
+      const { error: insertError } = await supabase.from("users").insert([
+        {
+          email: email,
+          name: name,
+          bio: bio,
+          displayname: displayname,
+          password: password, // Note: Don't store plain-text passwords in production
+        },
+      ]);
+
+      if (insertError) {
+        setError(`Failed to save user info: ${insertError.message}`);
+        return;
+      }
+
+      // Step 5: Redirect user after successful signup
+      setError(""); // Clear any previous errors
+      navigate("/login");
+    } catch (error) {
+      setError(`Unexpected error: ${error.message}`);
     }
   };
 
   return (
     <div style={{ maxWidth: "400px", margin: "50px auto", textAlign: "center" }}>
-      <h2>Signup</h2>
+      <h2>Sign Up</h2>
       <form onSubmit={handleSignup}>
+        <div style={{ marginBottom: "10px" }}>
+          <input
+            type="text"
+            placeholder="Full Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+          />
+        </div>
+        <div style={{ marginBottom: "10px" }}>
+          <textarea
+            placeholder="Bio"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            style={{ width: "100%", padding: "10px", marginBottom: "10px", minHeight: "100px" }}
+          />
+        </div>
         <div style={{ marginBottom: "10px" }}>
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+          />
+        </div>
+        <div style={{ marginBottom: "10px" }}>
+          <input
+            type="text"
+            placeholder="Display Name"
+            value={displayname}
+            onChange={(e) => setDisplayname(e.target.value)}
             style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
           />
         </div>
@@ -59,7 +144,6 @@ function Signup() {
           />
         </div>
         {error && <p style={{ color: "red" }}>{error}</p>}
-        {success && <p style={{ color: "green" }}>{success}</p>}
         <button
           type="submit"
           style={{
@@ -71,14 +155,9 @@ function Signup() {
             cursor: "pointer",
           }}
         >
-          Signup
+          Sign Up
         </button>
       </form>
-      <div style={{ marginTop: "20px" }}>
-        <p>
-          Already have an account? <Link to="/login">Back to Login</Link>
-        </p>
-      </div>
     </div>
   );
 }
