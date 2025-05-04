@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom"; // Import useNavigate
+import { Link, useNavigate } from "react-router-dom";
 import React, { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,32 +11,26 @@ function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const navigate = useNavigate(); // Hook to navigate to a different page
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
 
     try {
-      // Login request
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) {
-        setError("Login failed. Please check your credentials and verify your account.");
+        setError("Login failed. Please check your credentials.");
         return;
       }
 
       const { user } = data;
 
-      // Ensure email is verified
-      if (!user?.email_confirmed_at) {
-        setError("Your account is not verified. Please check your email.");
-        return;
-      }
-
-      // Check if the user exists in the 'users' table (don't insert if they exist)
+      // Optional: check if user exists in 'users' table, insert if missing
       const { data: existingUser, error: selectError } = await supabase
         .from("users")
         .select("*")
@@ -44,18 +38,25 @@ function Login({ onLogin }) {
         .single();
 
       if (selectError && selectError.code !== "PGRST116") {
-        console.error("Error fetching user:", selectError);
-        setError("Error checking registration status.");
+        console.error("Error checking user table:", selectError);
+        setError("An error occurred while checking your profile.");
         return;
       }
 
-      // Everything is good, set the logged-in user and redirect
+      if (!existingUser) {
+        await supabase.from("users").insert([
+          {
+            email: user.email,
+            name: "",
+            bio: "",
+            displayname: "",
+          },
+        ]);
+      }
+
       setError("");
       if (onLogin) onLogin(user);
-      
-      // Redirect to the homepage/dashboard
-      navigate("/dashboard");  // Adjust this URL to your preferred redirect page
-
+      navigate("/dashboard");
     } catch (error) {
       setError(`Unexpected error: ${error.message}`);
     }
@@ -65,24 +66,20 @@ function Login({ onLogin }) {
     <div style={{ maxWidth: "400px", margin: "50px auto", textAlign: "center" }}>
       <h2>Login</h2>
       <form onSubmit={handleLogin}>
-        <div style={{ marginBottom: "10px" }}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
-          />
-        </div>
-        <div style={{ marginBottom: "10px" }}>
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
-          />
-        </div>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+        />
         {error && <p style={{ color: "red" }}>{error}</p>}
         <button
           type="submit"

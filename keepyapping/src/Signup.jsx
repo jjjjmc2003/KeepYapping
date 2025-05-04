@@ -19,127 +19,128 @@ function Signup() {
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
-  
+
     if (!name || !bio || !email || !displayname || !password) {
       setError("All fields are required.");
       return;
     }
-  
+
     try {
-      // Step 1: Check if the email already exists
-      const { data: existingEmail } = await supabase
+      const { data: existingEmail, error: emailCheckError } = await supabase
         .from("users")
         .select("email")
         .eq("email", email)
         .single();
-  
+
+      if (emailCheckError && emailCheckError.code !== "PGRST116") {
+        setError(`Error checking email: ${emailCheckError.message}`);
+        return;
+      }
+
       if (existingEmail) {
         setError("This email is already associated with an account.");
         return;
       }
-  
-      // Step 2: Check if displayname already exists
-      const { data: existingDisplayname } = await supabase
-        .from("users")
-        .select("displayname")
-        .eq("displayname", displayname)
-        .single();
-  
+
+      const { data: existingDisplayname, error: displaynameCheckError } =
+        await supabase
+          .from("users")
+          .select("displayname")
+          .eq("displayname", displayname)
+          .single();
+
+      if (displaynameCheckError && displaynameCheckError.code !== "PGRST116") {
+        setError(`Error checking display name: ${displaynameCheckError.message}`);
+        return;
+      }
+
       if (existingDisplayname) {
         setError("This display name is already taken.");
         return;
       }
-  
-      // Step 3: Sign up the user
+
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
-  
+      
       if (signUpError) {
         setError(`Sign-up failed: ${signUpError.message}`);
         return;
       }
-  
-      // Step 4: Wait until the session is active
-      const { data: sessionData } = await supabase.auth.getSession();
-  
-      if (!sessionData.session) {
-        setError("Could not establish session. Please check your email for a confirmation link.");
-        return;
-      }
-  
-      // Step 5: Insert user data into 'users' table
+      
+      // ✅ Get the new user's ID (required for RLS auth)
+      const user_id = signUpData?.user?.id;
+      
+      // ✅ Check: Are we signed in yet?
+      const {
+        data: sessionData,
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      
+      
+      // ✅ Now insert into users table with authenticated session
       const { error: insertError } = await supabase.from("users").insert([
         {
           email,
           name,
           bio,
           displayname,
+          user_id, // assuming your table has a user_id column
         },
       ]);
-  
+      
       if (insertError) {
         setError(`Failed to save user info: ${insertError.message}`);
         return;
       }
-  
-      // Success
+      
+
+      setError("");
       navigate("/login");
-    } catch (err) {
-      setError(`Unexpected error: ${err.message}`);
+    } catch (error) {
+      setError(`Unexpected error: ${error.message}`);
     }
   };
-  
 
   return (
     <div style={{ maxWidth: "400px", margin: "50px auto", textAlign: "center" }}>
       <h2>Sign Up</h2>
       <form onSubmit={handleSignup}>
-        <div style={{ marginBottom: "10px" }}>
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
-          />
-        </div>
-        <div style={{ marginBottom: "10px" }}>
-          <textarea
-            placeholder="Bio"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            style={{ width: "100%", padding: "10px", marginBottom: "10px", minHeight: "100px" }}
-          />
-        </div>
-        <div style={{ marginBottom: "10px" }}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
-          />
-        </div>
-        <div style={{ marginBottom: "10px" }}>
-          <input
-            type="text"
-            placeholder="Display Name"
-            value={displayname}
-            onChange={(e) => setDisplayname(e.target.value)}
-            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
-          />
-        </div>
-        <div style={{ marginBottom: "10px" }}>
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
-          />
-        </div>
+        <input
+          type="text"
+          placeholder="Full Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+        />
+        <textarea
+          placeholder="Bio"
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "10px", minHeight: "100px" }}
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+        />
+        <input
+          type="text"
+          placeholder="Display Name"
+          value={displayname}
+          onChange={(e) => setDisplayname(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
+        />
         {error && <p style={{ color: "red" }}>{error}</p>}
         <button
           type="submit"
