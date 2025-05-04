@@ -14,11 +14,13 @@ function Signup() {
   const [displayname, setDisplayname] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState(""); // Add this state for success messages
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
+    setMessage(""); // Clear any previous messages
 
     if (!name || !bio || !email || !displayname || !password) {
       setError("All fields are required.");
@@ -27,11 +29,16 @@ function Signup() {
 
     try {
       // Check for duplicate email
-      const { data: existingEmail } = await supabase
+      const { data: existingEmail, error: emailCheckError } = await supabase
         .from("users")
         .select("email")
         .eq("email", email)
         .single();
+
+      if (emailCheckError && emailCheckError.code !== "PGRST116") {
+        setError(`Error checking email: ${emailCheckError.message}`);
+        return;
+      }
 
       if (existingEmail) {
         setError("This email is already associated with an account.");
@@ -39,11 +46,16 @@ function Signup() {
       }
 
       // Check for duplicate display name
-      const { data: existingDisplayname } = await supabase
+      const { data: existingDisplayname, error: displaynameCheckError } = await supabase
         .from("users")
         .select("displayname")
         .eq("displayname", displayname)
         .single();
+
+      if (displaynameCheckError && displaynameCheckError.code !== "PGRST116") {
+        setError(`Error checking display name: ${displaynameCheckError.message}`);
+        return;
+      }
 
       if (existingDisplayname) {
         setError("This display name is already taken.");
@@ -76,8 +88,21 @@ function Signup() {
         return;
       }
 
-      setError("");
-      navigate("/login");
+      // Log success and show confirmation message
+      console.log("✅ User data stored in database:", {
+        email,
+        name,
+        bio,
+        displayname,
+      });
+
+      setError(""); // Clear any previous errors
+      setMessage("Account has been created! Please check your email to confirm your account.");
+      
+      // Redirect to login page after 3 seconds
+      setTimeout(() => {
+        navigate("/login");
+      }, 3000);
     } catch (err) {
       setError(`Unexpected error: ${err.message}`);
     }
@@ -122,6 +147,7 @@ function Signup() {
           style={{ width: "100%", padding: "10px", marginBottom: "10px" }}
         />
         {error && <p style={{ color: "red" }}>{error}</p>}
+        {message && <p style={{ color: "green" }}>{message}</p>}
         <button
           type="submit"
           style={{
