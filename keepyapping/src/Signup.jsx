@@ -65,7 +65,7 @@ function Signup() {
       const { data: sessionData } = await supabase.auth.getSession();
   
       if (!sessionData.session) {
-        //setError("Could not establish session. Please check your email for a confirmation link.");
+        setError("Could not establish session. Please check your email for a confirmation link.");
         return;
       }
   
