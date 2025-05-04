@@ -24,7 +24,7 @@ function Login({ onLogin }) {
       });
 
       if (signInError) {
-        setError("Login failed. Please check your credentials.");
+        setError("Login failed. Please check your credentials and/or verify your account.");
         return;
       }
 

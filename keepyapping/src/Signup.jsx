@@ -26,80 +26,60 @@ function Signup() {
     }
 
     try {
-      const { data: existingEmail, error: emailCheckError } = await supabase
+      // Check for duplicate email
+      const { data: existingEmail } = await supabase
         .from("users")
         .select("email")
         .eq("email", email)
         .single();
-
-      if (emailCheckError && emailCheckError.code !== "PGRST116") {
-        setError(`Error checking email: ${emailCheckError.message}`);
-        return;
-      }
 
       if (existingEmail) {
         setError("This email is already associated with an account.");
         return;
       }
 
-      const { data: existingDisplayname, error: displaynameCheckError } =
-        await supabase
-          .from("users")
-          .select("displayname")
-          .eq("displayname", displayname)
-          .single();
-
-      if (displaynameCheckError && displaynameCheckError.code !== "PGRST116") {
-        setError(`Error checking display name: ${displaynameCheckError.message}`);
-        return;
-      }
+      // Check for duplicate display name
+      const { data: existingDisplayname } = await supabase
+        .from("users")
+        .select("displayname")
+        .eq("displayname", displayname)
+        .single();
 
       if (existingDisplayname) {
         setError("This display name is already taken.");
         return;
       }
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // Create auth user
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
-      
+
       if (signUpError) {
         setError(`Sign-up failed: ${signUpError.message}`);
         return;
       }
-      
-      // ✅ Get the new user's ID (required for RLS auth)
-      const user_id = signUpData?.user?.id;
-      
-      // ✅ Check: Are we signed in yet?
-      const {
-        data: sessionData,
-        error: sessionError,
-      } = await supabase.auth.getSession();
-      
-      
-      // ✅ Now insert into users table with authenticated session
+
+      // Insert profile data to users table
       const { error: insertError } = await supabase.from("users").insert([
         {
           email,
           name,
           bio,
           displayname,
-          user_id, // assuming your table has a user_id column
         },
       ]);
-      
+
       if (insertError) {
         setError(`Failed to save user info: ${insertError.message}`);
         return;
       }
-      
 
       setError("");
       navigate("/login");
-    } catch (error) {
-      setError(`Unexpected error: ${error.message}`);
+    } catch (err) {
+      setError(`Unexpected error: ${err.message}`);
     }
   };
 
