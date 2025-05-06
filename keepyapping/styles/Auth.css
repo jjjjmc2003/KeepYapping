@@ -1,0 +1,135 @@
+/* Auth.css - Styling for Login and Signup pages */
+
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--background-dark);
+  padding: 20px;
+}
+
+.auth-card {
+  background-color: var(--secondary-color);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  width: 100%;
+  max-width: 480px;
+  padding: 32px;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.auth-header p {
+  color: var(--text-color);
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background-color: var(--background-light);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: var(--border-radius);
+  color: var(--text-color);
+  font-size: 16px;
+  transition: border-color var(--transition-speed);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.form-group textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.auth-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-speed);
+  margin-top: 8px;
+}
+
+.auth-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.auth-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-color);
+  opacity: 0.8;
+}
+
+.auth-footer a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.error-message {
+  background-color: rgba(240, 71, 71, 0.1);
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color);
+  padding: 10px;
+  border-radius: var(--border-radius);
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.success-message {
+  background-color: rgba(67, 181, 129, 0.1);
+  border: 1px solid var(--success-color);
+  color: var(--success-color);
+  padding: 10px;
+  border-radius: var(--border-radius);
+  margin-bottom: 8px;
+  font-size: 14px;
+}

@@ -1,0 +1,159 @@
+/* Global CSS for KeepYapping application */
+
+:root {
+  --primary-color: #5865f2; /* Discord blue */
+  --primary-dark: #4752c4;
+  --secondary-color: #2e3136; /* Discord dark */
+  --text-color: #dcddde;
+  --background-dark: #36393f; /* Discord background */
+  --background-light: #40444b;
+  --background-hover: #32353b;
+  --success-color: #43b581; /* Discord green */
+  --danger-color: #f04747; /* Discord red */
+  --warning-color: #faa61a; /* Discord yellow/orange */
+  --info-color: #00b0f4; /* Discord light blue */
+  --border-radius: 5px;
+  --transition-speed: 0.2s;
+  --box-shadow: 0 2px 10px 0 rgba(0, 0, 0, 0.2);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background-color: var(--background-dark);
+  color: var(--text-color);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Common button styles */
+.btn {
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-speed);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.btn-success {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.btn-success:hover {
+  background-color: #3ca374;
+}
+
+.btn-danger {
+  background-color: var(--danger-color);
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #d84040;
+}
+
+.btn-secondary {
+  background-color: var(--background-light);
+  color: var(--text-color);
+}
+
+.btn-secondary:hover {
+  background-color: #4d5258;
+}
+
+/* Form elements */
+input, textarea, select {
+  background-color: var(--background-light);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: var(--border-radius);
+  padding: 8px 12px;
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Message styles */
+.error-message {
+  background-color: rgba(240, 71, 71, 0.1);
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color);
+  padding: 10px;
+  border-radius: var(--border-radius);
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.success-message {
+  background-color: rgba(67, 181, 129, 0.1);
+  border: 1px solid var(--success-color);
+  color: var(--success-color);
+  padding: 10px;
+  border-radius: var(--border-radius);
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.warning-message {
+  background-color: rgba(250, 166, 26, 0.1);
+  border: 1px solid var(--warning-color);
+  color: var(--warning-color);
+  padding: 10px;
+  border-radius: var(--border-radius);
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--background-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

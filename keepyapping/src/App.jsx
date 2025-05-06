@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import ChatApp from "./ChatApp";
 import Login from "./Login";
 import Signup from "./Signup";
+import HomePage from "./HomePage";
+
 
 function App() {
   const [user, setUser] = useState(null);
@@ -19,8 +21,9 @@ function App() {
             </>
           ) : (
             <>
-              <Route path="/" element={<ChatApp />} />
-              <Route path="*" element={<ChatApp />} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/chat" element={<ChatApp />} />
+              <Route path="*" element={<HomePage />} />
             </>
           )}
         </Routes>

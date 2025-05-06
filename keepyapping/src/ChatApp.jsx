@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import "../styles/ChatApp.css"; // Import the CSS file
-import FriendRequests from "./FriendRequests";
+import FriendSystem from "./FriendSystem";
+import { useNavigate } from "react-router-dom";
 
 // Supabase Setup
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
@@ -59,7 +60,8 @@ export default function ChatApp() {
   // Combined list of all possible user emails
   const [allPossibleUsers, setAllPossibleUsers] = useState([]);
   const [notification, setNotification] = useState(null);
-  
+  const navigate = useNavigate();
+
 
   // Predefined caregivers
   const predefinedEmails = [
@@ -149,7 +151,7 @@ export default function ChatApp() {
     const fetched = data || [];
     console.log("Fetched messages:", data); // Debugging log
     setMessages(fetched);
-    
+
 
     // Mark them as read
     if (fetched.length > 0) {
@@ -224,14 +226,17 @@ export default function ChatApp() {
           console.log("New message payload:", payload); // Debugging log
           const newMsg = payload.new;
           if (newMsg && newMsg.sender !== userEmail) {
-            let note = "";
+            // Create notification message based on message type
+            let notificationMessage = "";
             if (newMsg.type === "group") {
-              note = `New message in Organization Chat from ${newMsg.sender}`;
+              notificationMessage = `New message in Organization Chat from ${newMsg.sender}`;
             } else if (newMsg.type === "dm") {
-              note = `New direct message from ${newMsg.sender}`;
+              notificationMessage = `New direct message from ${newMsg.sender}`;
             } else if (newMsg.type === "multi_group") {
-              note = `New message in a private group from ${newMsg.sender}`;
+              notificationMessage = `New message in a private group from ${newMsg.sender}`;
             }
+
+            console.log("Setting notification:", notificationMessage);
             setNotification(`New Message from: ${newMsg.sender} (${newMsg.type})`);
           }
 
@@ -317,7 +322,7 @@ export default function ChatApp() {
     const sortedList = [...participants].sort();
     const groupString = sortedList.join(";");
 
-    
+
     const role = getRoleByEmail(userEmail);
     const messageData = {
       text: "Group chat created!",
@@ -361,7 +366,7 @@ export default function ChatApp() {
     setPrivateGroups([...groupSet]);
   }
 
-  // New function: Refresh everything manually 
+  // New function: Refresh everything manually
   function manualRefresh() {
     fetchMessages();
     fetchOrgUnreadCount();
@@ -399,16 +404,19 @@ export default function ChatApp() {
   return (
     <div
       style={{
-        maxWidth: "600px",
+        maxWidth: "800px",
         margin: "20px auto",
         textAlign: "center",
-        border: "1px solid #ddd",
-        padding: "15px",
-        borderRadius: "8px",
-        background: "#f9f9f9",
         position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        gap: "20px"
       }}
     >
+      {/* Pass userEmail to FriendSystem and log it for debugging */}
+      {console.log("ChatApp is passing userEmail to FriendSystem:", userEmail)}
+      <FriendSystem currentUserEmail={userEmail} />
+
       {/* Toast-Style Banner for new messages */}
       {newMessageNotification && (
         <div
@@ -429,7 +437,6 @@ export default function ChatApp() {
           {newMessageNotification}
         </div>
       )}
-      <FriendRequests userEmail={userEmail} />
 
       <h3>
         {chatMode === "group"
