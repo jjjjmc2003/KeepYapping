@@ -11,6 +11,8 @@ function FriendSystem({ currentUserEmail }) {
   const [searchEmail, setSearchEmail] = useState("");
   const [user, setUser] = useState(null);
   const [searchError, setSearchError] = useState("");
+  const [emailSuggestions, setEmailSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [requests, setRequests] = useState([]);
   const [requestError, setRequestError] = useState("");
@@ -26,15 +28,86 @@ function FriendSystem({ currentUserEmail }) {
     testDatabaseConnection();
   }, []);
 
+  // --- Handle Click Outside for Suggestions Dropdown ---
+  useEffect(() => {
+    function handleClickOutside(event) {
+      const searchContainer = document.querySelector('.search-input-wrapper');
+      if (searchContainer && !searchContainer.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Clean up
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // --- Fetch Email Suggestions ---
+  const fetchEmailSuggestions = async (query) => {
+    if (!query || query.length < 1) {
+      setEmailSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      // Fetch users whose email contains the query string
+      const { data, error } = await supabase
+        .from("users")
+        .select("email")
+        .ilike("email", `%${query}%`)
+        .limit(5); // Limit to 5 suggestions
+
+      if (error) {
+        console.error("Error fetching email suggestions:", error);
+        return;
+      }
+
+      // Filter out the current user and existing friends
+      const filteredSuggestions = data
+        .map(user => user.email)
+        .filter(email => email !== currentUserEmail && !friends.includes(email));
+
+      setEmailSuggestions(filteredSuggestions);
+      setShowSuggestions(filteredSuggestions.length > 0);
+    } catch (error) {
+      console.error("Unexpected error fetching email suggestions:", error);
+    }
+  };
+
+  // --- Handle Search Input Change ---
+  const handleSearchInputChange = (e) => {
+    const value = e.target.value;
+    setSearchEmail(value);
+    fetchEmailSuggestions(value);
+  };
+
+  // --- Select Suggestion ---
+  const selectSuggestion = (email) => {
+    setSearchEmail(email);
+    setShowSuggestions(false);
+    // Automatically search for the selected user
+    searchUserByEmail(email);
+  };
+
   // --- Search User ---
-  const searchUser = async () => {
+  const searchUser = () => {
+    searchUserByEmail(searchEmail);
+  };
+
+  // --- Search User By Email ---
+  const searchUserByEmail = async (email) => {
     setSearchError("");
     setUser(null);
 
     const { data, error } = await supabase
       .from("users")
       .select("email, name, displayname")
-      .eq("email", searchEmail)
+      .eq("email", email)
       .single();
 
     if (error) {
@@ -44,6 +117,7 @@ function FriendSystem({ currentUserEmail }) {
     }
 
     setUser(data);
+    setShowSuggestions(false);
   };
 
   // --- Send Friend Request ---
@@ -465,13 +539,33 @@ function FriendSystem({ currentUserEmail }) {
           </div>
 
           <div className="search-container">
-            <input
-              type="email"
-              className="search-input"
-              placeholder="Enter a user's email"
-              value={searchEmail}
-              onChange={(e) => setSearchEmail(e.target.value)}
-            />
+            <div className="search-input-wrapper">
+              <input
+                type="email"
+                className="search-input"
+                placeholder="Enter a user's email"
+                value={searchEmail}
+                onChange={handleSearchInputChange}
+                onFocus={() => searchEmail.length > 0 && setShowSuggestions(true)}
+                onBlur={() => {
+                  // Delay hiding suggestions to allow clicking on them
+                  setTimeout(() => setShowSuggestions(false), 200);
+                }}
+              />
+              {showSuggestions && emailSuggestions.length > 0 && (
+                <div className="email-suggestions">
+                  {emailSuggestions.map((email, index) => (
+                    <div
+                      key={index}
+                      className="suggestion-item"
+                      onClick={() => selectSuggestion(email)}
+                    >
+                      {email}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button className="btn btn-primary" onClick={searchUser}>Search</button>
           </div>
 
