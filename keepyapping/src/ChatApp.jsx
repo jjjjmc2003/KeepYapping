@@ -30,7 +30,7 @@ function getRoleByEmail(email) {
   return emailToRole[email] || "Volunteer";
 }
 
-export default function ChatApp() {
+export default function ChatApp({ onLogout }) {
   // State Variables
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -374,6 +374,15 @@ export default function ChatApp() {
     fetchPrivateGroups();
   }
 
+  // Handle logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    if (onLogout) {
+      onLogout(); // Call the onLogout function passed from App.jsx
+    }
+    navigate("/login");
+  };
+
   // toggle checkboxes for multi-group selection
   function toggleMultiGroupUser(u) {
     setMultiGroupUsers((prev) =>
@@ -415,7 +424,7 @@ export default function ChatApp() {
     >
       {/* Pass userEmail to FriendSystem and log it for debugging */}
       {console.log("ChatApp is passing userEmail to FriendSystem:", userEmail)}
-      <FriendSystem currentUserEmail={userEmail} />
+      
 
       {/* Toast-Style Banner for new messages */}
       {newMessageNotification && (
@@ -521,6 +530,22 @@ export default function ChatApp() {
         }}
       >
         Refresh Chat
+      </button>
+
+      {/* Logout button */}
+      <button
+        onClick={handleLogout}
+        style={{
+          marginLeft: "10px",
+          padding: "5px 10px",
+          background: "#dc3545",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          fontWeight: "bold"
+        }}
+      >
+        Logout
       </button>
 
       {/* DM Mode */}

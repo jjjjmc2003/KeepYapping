@@ -32,7 +32,7 @@ function getRoleByEmail(email) {
   return emailToRole[email] || "Volunteer";
 }
 
-function HomePage() {
+function HomePage({ onLogout }) {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -44,35 +44,35 @@ function HomePage() {
   useEffect(() => {
     async function fetchUserData() {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.user?.email) {
         navigate("/login");
         return;
       }
-      
+
       setUserEmail(session.user.email);
-      
+
       // Fetch user profile
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("*")
         .eq("email", session.user.email)
         .single();
-        
+
       if (userError) {
         console.error("Error fetching user data:", userError);
       } else if (userData) {
         setUserName(userData.displayname || userData.name || userData.email);
       }
     }
-    
+
     fetchUserData();
   }, [navigate]);
 
   // Fetch friends list
   useEffect(() => {
     if (!userEmail) return;
-    
+
     async function fetchFriends() {
       try {
         const { data, error } = await supabase
@@ -80,28 +80,28 @@ function HomePage() {
           .select("*")
           .or(`sender_email.eq.${userEmail},receiver_email.eq.${userEmail}`)
           .eq("status", "accepted");
-          
+
         if (error) {
           console.error("Error fetching friends:", error);
           return;
         }
-        
+
         if (!data) {
           setFriends([]);
           return;
         }
-        
+
         // Process friend data
         const friendsList = data.map(req => {
           return req.sender_email === userEmail ? req.receiver_email : req.sender_email;
         });
-        
+
         setFriends(friendsList);
       } catch (error) {
         console.error("Unexpected error fetching friends:", error);
       }
     }
-    
+
     async function fetchPendingRequests() {
       try {
         const { data, error } = await supabase
@@ -109,21 +109,21 @@ function HomePage() {
           .select("*")
           .eq("receiver_email", userEmail)
           .eq("status", "pending");
-          
+
         if (error) {
           console.error("Error fetching pending requests:", error);
           return;
         }
-        
+
         setPendingRequests(data || []);
       } catch (error) {
         console.error("Unexpected error fetching pending requests:", error);
       }
     }
-    
+
     fetchFriends();
     fetchPendingRequests();
-    
+
     // Set up real-time subscription for friend changes
     const subscription = supabase
       .channel("friend-changes")
@@ -136,7 +136,7 @@ function HomePage() {
         }
       )
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(subscription);
     };
@@ -145,6 +145,9 @@ function HomePage() {
   // Handle logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    if (onLogout) {
+      onLogout(); // Call the onLogout function passed from App.jsx
+    }
     navigate("/login");
   };
 
@@ -192,18 +195,18 @@ function HomePage() {
             <div className="user-status">{getRoleByEmail(userEmail)}</div>
           </div>
         </div>
-        
+
         {/* Navigation */}
         <div className="sidebar-nav">
-          <div 
+          <div
             className={`nav-item ${activeSection === "home" ? "active" : ""}`}
             onClick={() => setActiveSection("home")}
           >
             <div className="nav-icon">🏠</div>
             <div className="nav-text">Home</div>
           </div>
-          
-          <div 
+
+          <div
             className={`nav-item ${activeSection === "friends" ? "active" : ""}`}
             onClick={() => setActiveSection("friends")}
           >
@@ -213,16 +216,16 @@ function HomePage() {
               {pendingRequests.length > 0 && ` (${pendingRequests.length})`}
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`nav-item ${activeSection === "chat" ? "active" : ""}`}
             onClick={() => setActiveSection("chat")}
           >
             <div className="nav-icon">💬</div>
             <div className="nav-text">Chat</div>
           </div>
-          
-          <div 
+
+          <div
             className="nav-item"
             onClick={handleLogout}
           >
@@ -230,13 +233,13 @@ function HomePage() {
             <div className="nav-text">Logout</div>
           </div>
         </div>
-        
+
         {/* Friends list */}
         <div className="friends-list">
           <div className="friends-header">
             <div className="friends-title">Friends — {friends.length}</div>
           </div>
-          
+
           {friends.length === 0 ? (
             <div className="friend-item">
               <div className="friend-info">
@@ -245,8 +248,8 @@ function HomePage() {
             </div>
           ) : (
             friends.map((friend, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="friend-item"
                 onClick={() => {
                   setActiveSection("chat");
@@ -265,7 +268,7 @@ function HomePage() {
           )}
         </div>
       </div>
-      
+
       {/* Main content area */}
       <div className="main-content">
         <div className="content-header">
@@ -275,7 +278,7 @@ function HomePage() {
             {activeSection === "chat" && "Chat"}
           </div>
         </div>
-        
+
         <div className="content-body">
           {renderContent()}
         </div>

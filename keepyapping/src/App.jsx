@@ -21,9 +21,9 @@ function App() {
             </>
           ) : (
             <>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/chat" element={<ChatApp />} />
-              <Route path="*" element={<HomePage />} />
+              <Route path="/" element={<HomePage onLogout={() => setUser(null)} />} />
+              <Route path="/chat" element={<ChatApp onLogout={() => setUser(null)} />} />
+              <Route path="*" element={<HomePage onLogout={() => setUser(null)} />} />
             </>
           )}
         </Routes>
