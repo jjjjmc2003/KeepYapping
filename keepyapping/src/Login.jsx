@@ -56,6 +56,7 @@ function Login({ onLogin }) {
       }
 
       setError("");
+      // The onAuthStateChange listener in App.jsx will handle setting the user
       if (onLogin) onLogin(user);
       navigate("/");
     } catch (error) {
