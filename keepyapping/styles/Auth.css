@@ -9,6 +9,7 @@
 }
 
 .auth-card {
+  scroll-behavior: smooth;
   position: relative;
   z-index: 2;
   background-color: #1e1e1e;
@@ -18,6 +19,29 @@
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
   color: white;
 }
+
+
+    .auth-card::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .auth-card::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .auth-card::-webkit-scrollbar-thumb {
+      background-color: white;
+      border-radius: 10px;
+      transition: opacity 0.3s ease-in-out;
+      opacity: 0; /* starts hidden */
+    }
+
+    .auth-card::-webkit-scrollbar-thumb:hover {
+      opacity: 1; /* shows on hover */
+    }
+  
+
+
 
 .side-logo {
   position: absolute;

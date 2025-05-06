@@ -119,10 +119,12 @@ function Signup() {
         style={{
           backgroundColor: "rgba(20, 20, 20, 0.92)",
           borderRadius: "12px",
-          padding: "2rem",
+          padding: "1.5rem",
           boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
           backdropFilter: "blur(6px)",
-          width: "350px",
+          width: "320px",
+          maxHeight: "90vh",
+          overflowY: "auto",
           animation: "fadeIn 0.5s ease-in-out",
           zIndex: 1,
         }}
