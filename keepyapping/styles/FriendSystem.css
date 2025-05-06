@@ -156,6 +156,17 @@
   background-color: #d84040;
 }
 
+.btn-remove-friend {
+  padding: 2px 8px !important;
+  font-size: 14px;
+  font-weight: bold;
+  min-width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .btn-secondary {
   background-color: var(--background-light);
   color: var(--text-color);

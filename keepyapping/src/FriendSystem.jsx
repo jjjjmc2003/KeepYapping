@@ -163,6 +163,72 @@ function FriendSystem({ currentUserEmail }) {
     }
   };
 
+  // --- Remove Friend ---
+  const removeFriend = async (friendEmail) => {
+    if (!currentUserEmail || !friendEmail) {
+      console.error("Missing user email or friend email");
+      setFriendError("Error: Missing user information");
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmed = window.confirm(`Are you sure you want to remove ${friendEmail} from your friends list?`);
+    if (!confirmed) {
+      return; // User cancelled the operation
+    }
+
+    try {
+      console.log(`Removing friend: ${friendEmail}`);
+
+      // Find the friend request record(s) between these two users
+      const { data, error: fetchError } = await supabase
+        .from("friend_requests")
+        .select("*")
+        .or(`and(sender_email.eq.${currentUserEmail},receiver_email.eq.${friendEmail}),and(sender_email.eq.${friendEmail},receiver_email.eq.${currentUserEmail})`)
+        .eq("status", "accepted");
+
+      if (fetchError) {
+        console.error("Error finding friend request:", fetchError);
+        setFriendError(`Failed to find friend record: ${fetchError.message || fetchError.details || "Unknown error"}`);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.error("No friend record found between", currentUserEmail, "and", friendEmail);
+        setFriendError("Error: Friend record not found");
+        return;
+      }
+
+      // Delete the friend request record(s)
+      for (const record of data) {
+        const { error: deleteError } = await supabase
+          .from("friend_requests")
+          .delete()
+          .eq("id", record.id);
+
+        if (deleteError) {
+          console.error("Error deleting friend request:", deleteError);
+          setFriendError(`Failed to remove friend: ${deleteError.message || deleteError.details || "Unknown error"}`);
+          return;
+        }
+      }
+
+      console.log(`Successfully removed friend: ${friendEmail}`);
+
+      // Show a temporary success message
+      setFriendError(`Successfully removed ${friendEmail} from your friends list!`);
+      setTimeout(() => {
+        setFriendError("");
+      }, 3000);
+
+      // Refresh the data
+      fetchFriends();
+    } catch (unexpectedError) {
+      console.error("Unexpected error in removeFriend:", unexpectedError);
+      setFriendError(`Unexpected error: ${unexpectedError.message || "Unknown error occurred"}`);
+    }
+  };
+
   // --- Fetch Accepted Friends ---
   const fetchFriends = async () => {
     // Check if currentUserEmail is valid
@@ -542,6 +608,15 @@ function FriendSystem({ currentUserEmail }) {
               <div className="friend-info">
                 <div className="friend-name">{friend}</div>
                 <div className="friend-status">Online</div>
+              </div>
+              <div className="friend-actions">
+                <button
+                  className="btn btn-danger btn-remove-friend"
+                  onClick={() => removeFriend(friend)}
+                  title="Remove friend"
+                >
+                  X
+                </button>
               </div>
             </div>
           ))}
