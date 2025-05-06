@@ -29,7 +29,7 @@ const emailToRole = {
 };
 
 function getRoleByEmail(email) {
-  return emailToRole[email] || "Volunteer";
+  return emailToRole[email] || "User";
 }
 
 function HomePage({ onLogout }) {

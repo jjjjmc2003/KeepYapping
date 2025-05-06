@@ -763,7 +763,7 @@ function FriendSystem({ currentUserEmail }) {
         {/* Friends List */}
         <div className="friend-section">
           <div className="friend-section-header">
-            <h3>Friends</h3>
+            <h3>Delete Friends</h3>
           </div>
 
           {friendError && (
@@ -834,7 +834,7 @@ function FriendSystem({ currentUserEmail }) {
               </p>
               <p><strong>Incoming Requests:</strong> {requests.length}</p>
               <p><strong>Outgoing Requests:</strong> {outgoingRequests.length}</p>
-              <p><strong>Friends:</strong> {friends.length}</p>
+              <p><strong>Remove Friends:</strong> {friends.length}</p>
               <p><strong>All Requests:</strong> {allRequests.length}</p>
 
               {outgoingRequestsError && (
