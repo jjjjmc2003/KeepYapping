@@ -9,57 +9,45 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function Login({ onLogin }) {
+function ForgotPassword() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     setError("");
+    setMessage("");
+    setIsLoading(true);
+
+    if (!email) {
+      setError("Email is required.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Call Supabase's password reset function
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/reset-password",
       });
 
-      if (signInError) {
-        setError("Login failed. Please check your credentials and/or verify your account.");
-        return;
+      // Log the redirect URL for configuration purposes
+      console.log("Redirect URL:", window.location.origin + "/reset-password");
+
+      if (resetError) {
+        setError(resetError.message);
+      } else {
+        setMessage("Password reset instructions sent to your email.");
+        // Clear the form
+        setEmail("");
       }
-
-      const { user } = data;
-
-      const { data: existingUser, error: selectError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single();
-
-      if (selectError && selectError.code !== "PGRST116") {
-        console.error("Error checking user table:", selectError);
-        setError("An error occurred while checking your profile.");
-        return;
-      }
-
-      if (!existingUser) {
-        await supabase.from("users").insert([
-          {
-            email: user.email,
-            name: "",
-            bio: "",
-            displayname: "",
-          },
-        ]);
-      }
-
-      setError("");
-      if (onLogin) onLogin(user);
-      navigate("/");
-    } catch (error) {
-      setError(`Unexpected error: ${error.message}`);
+    } catch (err) {
+      setError(`Unexpected error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -79,11 +67,11 @@ function Login({ onLogin }) {
         backgroundPosition: "center",
       }}
     >
-      {/* Login Card */}
+      {/* Forgot Password Card */}
       <div
         className="auth-card"
         style={{
-         backgroundColor: "rgba(20, 20, 20, 0.92)",
+          backgroundColor: "rgba(20, 20, 20, 0.92)",
           borderRadius: "12px",
           padding: "1.5rem",
           boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
@@ -96,11 +84,11 @@ function Login({ onLogin }) {
         }}
       >
         <div className="auth-header" style={{ textAlign: "center", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#fff" }}>Welcome to KeepYapping</h2>
-          <p style={{ color: "#ccc", fontSize: "0.95rem" }}>Log in to your account</p>
+          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#fff" }}>Reset Password</h2>
+          <p style={{ color: "#ccc", fontSize: "0.95rem" }}>Enter your email to receive a password reset link</p>
         </div>
 
-        <form className="auth-form" onSubmit={handleLogin}>
+        <form className="auth-form" onSubmit={handleResetPassword}>
           {error && (
             <div
               className="error-message"
@@ -114,6 +102,22 @@ function Login({ onLogin }) {
               }}
             >
               {error}
+            </div>
+          )}
+
+          {message && (
+            <div
+              className="success-message"
+              style={{
+                backgroundColor: "#4CAF50",
+                color: "#fff",
+                padding: "0.75rem",
+                borderRadius: "6px",
+                marginBottom: "1rem",
+                textAlign: "center",
+              }}
+            >
+              {message}
             </div>
           )}
 
@@ -141,38 +145,10 @@ function Login({ onLogin }) {
             />
           </div>
 
-          <div className="form-group" style={{ marginBottom: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <label htmlFor="password" style={{ color: "#bbb", fontSize: "0.9rem", fontWeight: "500" }}>
-                Password
-              </label>
-              <Link to="/forgot-password" style={{ color: "#6366f1", fontSize: "0.8rem", textDecoration: "none" }}>
-                Forgot Password?
-              </Link>
-            </div>
-            <input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{
-                width: "100%",
-                backgroundColor: "#1e1e1e",
-                color: "#fff",
-                border: "1px solid #444",
-                borderRadius: "8px",
-                padding: "0.75rem",
-                fontSize: "1rem",
-                marginTop: "0.25rem",
-              }}
-            />
-          </div>
-
           <button
             className="auth-button"
             type="submit"
+            disabled={isLoading}
             style={{
               backgroundColor: "#6366f1",
               color: "white",
@@ -181,22 +157,23 @@ function Login({ onLogin }) {
               borderRadius: "8px",
               padding: "0.75rem",
               fontSize: "1rem",
-              cursor: "pointer",
+              cursor: isLoading ? "not-allowed" : "pointer",
               width: "100%",
               transition: "background-color 0.3s",
+              opacity: isLoading ? 0.7 : 1,
             }}
-            onMouseOver={(e) => (e.target.style.backgroundColor = "#4f46e5")}
-            onMouseOut={(e) => (e.target.style.backgroundColor = "#6366f1")}
+            onMouseOver={(e) => !isLoading && (e.target.style.backgroundColor = "#4f46e5")}
+            onMouseOut={(e) => !isLoading && (e.target.style.backgroundColor = "#6366f1")}
           >
-            Log In
+            {isLoading ? "Sending..." : "Send Reset Link"}
           </button>
         </form>
 
         <div className="auth-footer" style={{ textAlign: "center", marginTop: "1rem", fontSize: "0.9rem" }}>
           <p style={{ color: "#aaa" }}>
-            Don't have an account?{" "}
-            <Link to="/signup" style={{ color: "#6366f1", textDecoration: "none" }}>
-              Sign up
+            Remember your password?{" "}
+            <Link to="/login" style={{ color: "#6366f1", textDecoration: "none" }}>
+              Log in
             </Link>
           </p>
         </div>
@@ -215,4 +192,4 @@ function Login({ onLogin }) {
   );
 }
 
-export default Login;
+export default ForgotPassword;
