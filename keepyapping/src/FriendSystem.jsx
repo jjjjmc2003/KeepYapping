@@ -60,19 +60,32 @@ function FriendSystem({ currentUserEmail }) {
         .from("users")
         .select("email")
         .ilike("email", `%${query}%`)
-        .limit(5); // Limit to 5 suggestions
+        .limit(10); // Fetch more initially, we'll filter some out
 
       if (error) {
         console.error("Error fetching email suggestions:", error);
         return;
       }
 
-      // Filter out the current user and existing friends
+      // Get emails of users with pending requests (both incoming and outgoing)
+      const pendingEmails = [
+        ...outgoingRequests.map(req => req.receiver_email),
+        ...requests.map(req => req.sender_email)
+      ];
+
+      // Filter out:
+      // 1. The current user
+      // 2. Existing friends
+      // 3. Users with pending requests
       const filteredSuggestions = data
         .map(user => user.email)
-        .filter(email => email !== currentUserEmail && !friends.includes(email));
+        .filter(email =>
+          email !== currentUserEmail &&
+          !friends.includes(email) &&
+          !pendingEmails.includes(email)
+        );
 
-      setEmailSuggestions(filteredSuggestions);
+      setEmailSuggestions(filteredSuggestions.slice(0, 5)); // Limit to 5 after filtering
       setShowSuggestions(filteredSuggestions.length > 0);
     } catch (error) {
       console.error("Unexpected error fetching email suggestions:", error);
@@ -122,6 +135,55 @@ function FriendSystem({ currentUserEmail }) {
 
   // --- Send Friend Request ---
   const sendFriendRequest = async () => {
+    if (!user || !user.email) {
+      setSearchError("No user selected.");
+      return;
+    }
+
+    // Check if they're already friends
+    if (friends.includes(user.email)) {
+      setSearchError("This user is already your friend.");
+      return;
+    }
+
+    // Check if a friend request already exists (either sent or received)
+    const { data: existingRequests, error: checkError } = await supabase
+      .from("friend_requests")
+      .select("*")
+      .or(
+        `and(sender_email.eq.${currentUserEmail},receiver_email.eq.${user.email}),` +
+        `and(sender_email.eq.${user.email},receiver_email.eq.${currentUserEmail})`
+      );
+
+    if (checkError) {
+      console.error("Error checking existing friend requests:", checkError);
+      setSearchError("Failed to check existing friend requests.");
+      return;
+    }
+
+    if (existingRequests && existingRequests.length > 0) {
+      const request = existingRequests[0];
+
+      // If there's a pending request from the other user to current user
+      if (request.sender_email === user.email && request.status === "pending") {
+        setSearchError("This user has already sent you a friend request. Check your incoming requests.");
+        return;
+      }
+
+      // If there's a pending request from current user to the other user
+      if (request.sender_email === currentUserEmail && request.status === "pending") {
+        setSearchError("You have already sent a friend request to this user.");
+        return;
+      }
+
+      // If there's a rejected request
+      if (request.status === "rejected") {
+        setSearchError("A previous friend request was rejected. Please try again later.");
+        return;
+      }
+    }
+
+    // If we get here, it's safe to send a new friend request
     const { error } = await supabase.from("friend_requests").insert([
       {
         sender_email: currentUserEmail,
@@ -139,6 +201,9 @@ function FriendSystem({ currentUserEmail }) {
     alert("Friend request sent!");
     setUser(null); // clear search result
     setSearchEmail(""); // clear input
+
+    // Refresh outgoing requests
+    fetchOutgoingRequests();
   };
 
   // --- Fetch Friend Requests ---
@@ -583,9 +648,30 @@ function FriendSystem({ currentUserEmail }) {
                 <div className="friend-status">Found user</div>
               </div>
               <div className="friend-actions">
-                <button className="btn btn-success" onClick={sendFriendRequest}>
-                  Send Friend Request
-                </button>
+                {/* Check if this is the current user */}
+                {user.email === currentUserEmail ? (
+                  <div className="friend-status-message">This is you</div>
+                ) : (
+                  /* Check if they're already friends */
+                  friends.includes(user.email) ? (
+                    <div className="friend-status-message">Already friends</div>
+                  ) : (
+                    /* Check if there's a pending outgoing request */
+                    outgoingRequests.some(req => req.receiver_email === user.email) ? (
+                      <div className="friend-status-message">Request pending</div>
+                    ) : (
+                      /* Check if there's a pending incoming request */
+                      requests.some(req => req.sender_email === user.email) ? (
+                        <div className="friend-status-message">Request received</div>
+                      ) : (
+                        /* Otherwise, show the Add Friend button */
+                        <button className="btn btn-success" onClick={sendFriendRequest}>
+                          Send Friend Request
+                        </button>
+                      )
+                    )
+                  )
+                )}
               </div>
             </div>
           )}
