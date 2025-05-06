@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function FriendSystem({ currentUserEmail }) {
+function FriendSystem({ currentUserEmail, onFriendUpdate }) {
   const [searchEmail, setSearchEmail] = useState("");
   const [user, setUser] = useState(null);
   const [searchError, setSearchError] = useState("");
@@ -370,62 +370,43 @@ function FriendSystem({ currentUserEmail }) {
 
   // --- Fetch Accepted Friends ---
   const fetchFriends = async () => {
-    // Check if currentUserEmail is valid
     if (!currentUserEmail) {
-      console.error("No user email provided to fetchFriends");
-      setFriendError("Error: No user email available. Please log in again.");
+      setFriendError("No user email available");
       return;
     }
-
+  
     try {
-      console.log("Fetching accepted friends for:", currentUserEmail);
-
+      console.log("Fetching friends for:", currentUserEmail);
+  
       const { data, error } = await supabase
         .from("friend_requests")
         .select("*")
-        .or(`sender_email.eq.${currentUserEmail},receiver_email.eq.${currentUserEmail}`)
-        .eq("status", "accepted");
-
+        .or(`and(sender_email.eq.${currentUserEmail},status.eq.accepted),and(receiver_email.eq.${currentUserEmail},status.eq.accepted)`)
+  
       if (error) {
         console.error("Error fetching friends:", error);
-        setFriendError(`Database error: ${error.message || error.details || "Unknown error"}`);
+        setFriendError(`Failed to fetch friends: ${error.message || error.details || "Unknown error"}`);
         return;
       }
-
-      // Check if data is null or undefined
-      if (!data) {
-        console.error("No data returned when fetching friends");
-        setFriendError("Warning: No data returned from the database.");
-        setFriends([]);
-        return;
+  
+      // Process the data to extract friends
+      const friendList = data.map(item => {
+        return item.sender_email === currentUserEmail 
+          ? item.receiver_email 
+          : item.sender_email;
+      });
+  
+      console.log("Friends fetched:", friendList);
+      setFriends(friendList);
+      setFriendError("");
+  
+      // Notify parent component about updated friends list
+      if (onFriendsUpdate && typeof onFriendsUpdate === 'function') {
+        onFriendsUpdate(friendList);
       }
-
-      console.log("Accepted friends data from Supabase:", data);
-
-      // Check if data is empty
-      if (data.length === 0) {
-        console.log("No accepted friends found for user:", currentUserEmail);
-        setFriendError(""); // Clear any previous errors
-        setFriends([]);
-        return;
-      }
-
-      try {
-        const friendList = data.map((req) =>
-          req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
-        );
-
-        console.log("Processed friend list:", friendList);
-        setFriends(friendList);
-        setFriendError("");
-      } catch (mapError) {
-        console.error("Error processing friend data:", mapError);
-        setFriendError(`Error processing friend data: ${mapError.message || "Unknown error"}`);
-        setFriends([]);
-      }
-    } catch (unexpectedError) {
-      console.error("Unexpected error in fetchFriends:", unexpectedError);
-      setFriendError(`Unexpected error: ${unexpectedError.message || "Unknown error occurred"}`);
+    } catch (error) {
+      console.error("Unexpected error in fetchFriends:", error);
+      setFriendError(`Unexpected error: ${error.message || "Unknown error"}`);
     }
   };
 
@@ -445,26 +426,58 @@ function FriendSystem({ currentUserEmail }) {
 
     // Set up real-time subscription for friend request changes
     const subscription = supabase
-      .channel("friend-requests")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "friend_requests" },
-        (payload) => {
-          console.log("Friend request change detected:", payload);
-          fetchFriendRequests();
-          fetchFriends();
-          fetchOutgoingRequests();
-        }
-      )
-      .subscribe();
+    .channel(`friend-system-${Date.now()}`) // Unique channel name to avoid conflicts
+    .on(
+      "postgres_changes",
+      { 
+        event: "INSERT", 
+        schema: "public", 
+        table: "friend_requests",
+        filter: `receiver_email=eq.${currentUserEmail}` 
+      },
+      (payload) => {
+        console.log("🔔 New friend request received:", payload);
+        fetchFriendRequests(); // Refresh incoming requests
+      }
+    )
+    .on(
+      "postgres_changes",
+      { 
+        event: "UPDATE", 
+        schema: "public", 
+        table: "friend_requests",
+        filter: `or(sender_email=eq.${currentUserEmail},receiver_email=eq.${currentUserEmail})` 
+      },
+      (payload) => {
+        console.log("🔄 Friend request updated:", payload);
+        fetchFriendRequests(); 
+        fetchFriends(); // Important: refresh friends list when request status changes
+        fetchOutgoingRequests();
+      }
+    )
+    .on(
+      "postgres_changes",
+      { 
+        event: "DELETE", 
+        schema: "public", 
+        table: "friend_requests" 
+      },
+      (payload) => {
+        console.log("❌ Friend request deleted:", payload);
+        fetchFriendRequests();
+        fetchFriends();
+        fetchOutgoingRequests();
+      }
+    )
+    .subscribe((status) => {
+      console.log("📡 Subscription status:", status);
+    });
 
-    console.log("Supabase real-time subscription set up for friend requests");
-
-    return () => {
-      console.log("Cleaning up Supabase subscription");
-      supabase.removeChannel(subscription);
-    };
-  }, [currentUserEmail]); // Re-run when currentUserEmail changes
+  return () => {
+    console.log("Cleaning up subscription");
+    subscription && supabase.removeChannel(subscription);
+  };
+}, [currentUserEmail]);
 
   // Function to manually refresh all friend data
   const refreshFriendData = () => {
