@@ -142,14 +142,9 @@ function Login({ onLogin }) {
           </div>
 
           <div className="form-group" style={{ marginBottom: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <label htmlFor="password" style={{ color: "#bbb", fontSize: "0.9rem", fontWeight: "500" }}>
-                Password
-              </label>
-              <Link to="/forgot-password" style={{ color: "#6366f1", fontSize: "0.8rem", textDecoration: "none" }}>
-                Forgot Password?
-              </Link>
-            </div>
+            <label htmlFor="password" style={{ color: "#bbb", fontSize: "0.9rem", fontWeight: "500" }}>
+              Password
+            </label>
             <input
               id="password"
               type="password"
