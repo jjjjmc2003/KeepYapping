@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useNavigate, Link } from "react-router-dom";
 import "../styles/Auth.css";
+import backgroundImage from "./Images/KeepYappingLogo.png";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function Signup() {
@@ -15,13 +17,13 @@ function Signup() {
   const [displayname, setDisplayname] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState(""); // Add this state for success messages
+  const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
-    setMessage(""); // Clear any previous messages
+    setMessage("");
 
     if (!name || !bio || !email || !displayname || !password) {
       setError("All fields are required.");
@@ -29,7 +31,6 @@ function Signup() {
     }
 
     try {
-      // Check for duplicate email
       const { data: existingEmail, error: emailCheckError } = await supabase
         .from("users")
         .select("email")
@@ -46,12 +47,12 @@ function Signup() {
         return;
       }
 
-      // Check for duplicate display name
-      const { data: existingDisplayname, error: displaynameCheckError } = await supabase
-        .from("users")
-        .select("displayname")
-        .eq("displayname", displayname)
-        .single();
+      const { data: existingDisplayname, error: displaynameCheckError } =
+        await supabase
+          .from("users")
+          .select("displayname")
+          .eq("displayname", displayname)
+          .single();
 
       if (displaynameCheckError && displaynameCheckError.code !== "PGRST116") {
         setError(`Error checking display name: ${displaynameCheckError.message}`);
@@ -63,7 +64,6 @@ function Signup() {
         return;
       }
 
-      // Create auth user
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -74,7 +74,6 @@ function Signup() {
         return;
       }
 
-      // Insert profile data to users table
       const { error: insertError } = await supabase.from("users").insert([
         {
           email,
@@ -89,18 +88,8 @@ function Signup() {
         return;
       }
 
-      // Log success and show confirmation message
-      console.log("✅ User data stored in database:", {
-        email,
-        name,
-        bio,
-        displayname,
-      });
-
-      setError(""); // Clear any previous errors
       setMessage("Account has been created! Please check your email to confirm your account.");
 
-      // Redirect to login page after 3 seconds
       setTimeout(() => {
         navigate("/login");
       }, 3000);
@@ -110,89 +99,159 @@ function Signup() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h2>Create an Account</h2>
-          <p>Join KeepYapping today</p>
+    <div
+      className="auth-container"
+      style={{
+        height: "100vh",
+        backgroundColor: "#111",
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundRepeat: "repeat",
+        backgroundSize: "230px 230px",
+        backgroundPosition: "center",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      <div
+        className="auth-card"
+        style={{
+          backgroundColor: "rgba(20, 20, 20, 0.92)",
+          borderRadius: "12px",
+          padding: "1.5rem",
+          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
+          backdropFilter: "blur(6px)",
+          width: "320px",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          animation: "fadeIn 0.5s ease-in-out",
+          zIndex: 1,
+        }}
+      >
+        <div className="auth-header" style={{ textAlign: "center", marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "700", color: "#fff" }}>Create an Account</h2>
+          <p style={{ color: "#ccc" }}>Join KeepYapping today</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSignup}>
-          {error && <div className="error-message">{error}</div>}
-          {message && <div className="success-message">{message}</div>}
+          {error && <div style={{ color: "red", marginBottom: "10px" }}>{error}</div>}
+          {message && <div style={{ color: "lightgreen", marginBottom: "10px" }}>{message}</div>}
 
-          <div className="form-group">
-            <label htmlFor="name">Full Name</label>
+          <div className="form-group" style={{ marginBottom: "1rem" }}>
+            <label htmlFor="name" style={{ color: "#ccc" }}>Full Name</label>
             <input
               id="name"
               type="text"
-              placeholder="Enter your full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your full name"
               required
+              style={inputStyle}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="displayname">Display Name</label>
+          <div className="form-group" style={{ marginBottom: "1rem" }}>
+            <label htmlFor="displayname" style={{ color: "#ccc" }}>Display Name</label>
             <input
               id="displayname"
               type="text"
-              placeholder="Choose a display name"
               value={displayname}
               onChange={(e) => setDisplayname(e.target.value)}
+              placeholder="Choose a display name"
               required
+              style={inputStyle}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
+          <div className="form-group" style={{ marginBottom: "1rem" }}>
+            <label htmlFor="email" style={{ color: "#ccc" }}>Email</label>
             <input
               id="email"
               type="email"
-              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
               required
+              style={inputStyle}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="bio">Bio</label>
+          <div className="form-group" style={{ marginBottom: "1rem" }}>
+            <label htmlFor="bio" style={{ color: "#ccc" }}>Bio</label>
             <textarea
               id="bio"
-              placeholder="Tell us about yourself"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
+              placeholder="Tell us about yourself"
               required
+              style={{ ...inputStyle, height: "80px", resize: "none" }}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
+          <div className="form-group" style={{ marginBottom: "1rem" }}>
+            <label htmlFor="password" style={{ color: "#ccc" }}>Password</label>
             <input
               id="password"
               type="password"
-              placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="Create a password"
               required
+              style={inputStyle}
             />
           </div>
 
-          <button className="auth-button" type="submit">
+          <button
+            className="auth-button"
+            type="submit"
+            style={{
+              backgroundColor: "#6366f1",
+              color: "#fff",
+              padding: "0.75rem",
+              borderRadius: "8px",
+              border: "none",
+              fontWeight: "600",
+              fontSize: "1rem",
+              width: "100%",
+              cursor: "pointer",
+            }}
+          >
             Sign Up
           </button>
         </form>
 
-        <div className="auth-footer">
-          <p>
-            Already have an account? <Link to="/login">Log in</Link>
+        <div className="auth-footer" style={{ textAlign: "center", marginTop: "1rem" }}>
+          <p style={{ color: "#aaa", fontSize: "0.9rem" }}>
+            Already have an account?{" "}
+            <Link to="/login" style={{ color: "#6366f1", textDecoration: "none" }}>
+              Log in
+            </Link>
           </p>
         </div>
       </div>
+
+      {/* Animation keyframes */}
+      <style>
+        {`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+          }
+        `}
+      </style>
     </div>
   );
 }
+
+const inputStyle = {
+  width: "100%",
+  padding: "0.75rem",
+  backgroundColor: "#1e1e1e",
+  color: "#fff",
+  border: "1px solid #444",
+  borderRadius: "8px",
+  fontSize: "1rem",
+};
 
 export default Signup;
