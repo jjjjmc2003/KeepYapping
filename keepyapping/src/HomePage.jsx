@@ -39,6 +39,7 @@ function HomePage({ onLogout }) {
   const [friends, setFriends] = useState([]);
   const [activeSection, setActiveSection] = useState("home");
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [selectedFriend, setSelectedFriend] = useState("");
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -176,7 +177,7 @@ function HomePage({ onLogout }) {
       case "friends":
         return <FriendSystem currentUserEmail={userEmail} />;
       case "chat":
-        return <ChatApp />;
+        return <ChatApp userEmail={userEmail} selectedFriend={selectedFriend} />;
       default:
         return (
           <div className="welcome-message">
@@ -268,8 +269,8 @@ function HomePage({ onLogout }) {
                 key={index}
                 className="friend-item"
                 onClick={() => {
+                  setSelectedFriend(friend);
                   setActiveSection("chat");
-                  // Additional logic to open DM with this friend could be added here
                 }}
               >
                 <div className="friend-avatar">

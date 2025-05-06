@@ -30,7 +30,7 @@ function getRoleByEmail(email) {
   return emailToRole[email] || "Volunteer";
 }
 
-export default function ChatApp({ onLogout }) {
+export default function ChatApp({ onLogout, userEmail: propUserEmail, selectedFriend }) {
   // State Variables
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -83,15 +83,29 @@ export default function ChatApp({ onLogout }) {
  //sets the user email and fetches all users
   useEffect(() => {
     (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user?.email) {
-        setUserEmail(session.user.email);
+      // If userEmail is provided as a prop, use it directly
+      if (propUserEmail) {
+        setUserEmail(propUserEmail);
+      } else {
+        // Otherwise get it from the session
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.user?.email) {
+          setUserEmail(session.user.email);
+        }
       }
       await fetchAllUsers();
     })();
-  }, []);
+  }, [propUserEmail]);
+
+  // Handle selectedFriend prop changes
+  useEffect(() => {
+    if (selectedFriend) {
+      setChatMode("dm");
+      setSelectedUser(selectedFriend);
+    }
+  }, [selectedFriend]);
 
   // Fetch all users
   async function fetchAllUsers() {
@@ -105,8 +119,12 @@ export default function ChatApp({ onLogout }) {
 
       const userTableEmails = data.map((u) => u.email);
       const combined = new Set([...userTableEmails, ...predefinedEmails]);
-      // Exclude self
-      const finalList = [...combined].filter((email) => email !== userEmail);
+
+      // Exclude self if userEmail is set
+      const finalList = userEmail
+        ? [...combined].filter((email) => email !== userEmail)
+        : [...combined];
+
       setAllPossibleUsers(finalList);
     } catch (err) {
       console.error("Unexpected error fetching all users:", err);
@@ -283,6 +301,7 @@ export default function ChatApp({ onLogout }) {
       fetchOrgUnreadCount();
       fetchDMUnreadChats();
       fetchPrivateGroups();
+      fetchAllUsers(); // Also refetch users when userEmail changes
     }
   }, [chatMode, selectedUser, multiGroupRecipient, userEmail]);
 
@@ -424,7 +443,7 @@ export default function ChatApp({ onLogout }) {
     >
       {/* Pass userEmail to FriendSystem and log it for debugging */}
       {console.log("ChatApp is passing userEmail to FriendSystem:", userEmail)}
-      
+
 
       {/* Toast-Style Banner for new messages */}
       {newMessageNotification && (
