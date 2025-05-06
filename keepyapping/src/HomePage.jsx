@@ -69,60 +69,69 @@ function HomePage({ onLogout }) {
     fetchUserData();
   }, [navigate]);
 
+  // Function to refresh friends list
+  const refreshFriendsList = async () => {
+    if (!userEmail) return;
+
+    console.log("Refreshing sidebar friends list");
+    await fetchFriends();
+    await fetchPendingRequests();
+  };
+
+  // Fetch friends data
+  async function fetchFriends() {
+    try {
+      const { data, error } = await supabase
+        .from("friend_requests")
+        .select("*")
+        .or(`sender_email.eq.${userEmail},receiver_email.eq.${userEmail}`)
+        .eq("status", "accepted");
+
+      if (error) {
+        console.error("Error fetching friends:", error);
+        return;
+      }
+
+      if (!data) {
+        setFriends([]);
+        return;
+      }
+
+      // Process friend data
+      const friendsList = data.map(req => {
+        return req.sender_email === userEmail ? req.receiver_email : req.sender_email;
+      });
+
+      setFriends(friendsList);
+    } catch (error) {
+      console.error("Unexpected error fetching friends:", error);
+    }
+  }
+
+  async function fetchPendingRequests() {
+    try {
+      const { data, error } = await supabase
+        .from("friend_requests")
+        .select("*")
+        .eq("receiver_email", userEmail)
+        .eq("status", "pending");
+
+      if (error) {
+        console.error("Error fetching pending requests:", error);
+        return;
+      }
+
+      setPendingRequests(data || []);
+    } catch (error) {
+      console.error("Unexpected error fetching pending requests:", error);
+    }
+  }
+
   // Fetch friends list
   useEffect(() => {
     if (!userEmail) return;
 
-    async function fetchFriends() {
-      try {
-        const { data, error } = await supabase
-          .from("friend_requests")
-          .select("*")
-          .or(`sender_email.eq.${userEmail},receiver_email.eq.${userEmail}`)
-          .eq("status", "accepted");
-
-        if (error) {
-          console.error("Error fetching friends:", error);
-          return;
-        }
-
-        if (!data) {
-          setFriends([]);
-          return;
-        }
-
-        // Process friend data
-        const friendsList = data.map(req => {
-          return req.sender_email === userEmail ? req.receiver_email : req.sender_email;
-        });
-
-        setFriends(friendsList);
-      } catch (error) {
-        console.error("Unexpected error fetching friends:", error);
-      }
-    }
-
-    async function fetchPendingRequests() {
-      try {
-        const { data, error } = await supabase
-          .from("friend_requests")
-          .select("*")
-          .eq("receiver_email", userEmail)
-          .eq("status", "pending");
-
-        if (error) {
-          console.error("Error fetching pending requests:", error);
-          return;
-        }
-
-        setPendingRequests(data || []);
-      } catch (error) {
-        console.error("Unexpected error fetching pending requests:", error);
-      }
-    }
-
-    fetchFriends();
-    fetchPendingRequests();
+    refreshFriendsList();
 
     // Set up real-time subscription for friend changes
     const subscription = supabase
@@ -238,6 +247,13 @@ function HomePage({ onLogout }) {
         <div className="friends-list">
           <div className="friends-header">
             <div className="friends-title">Friends — {friends.length}</div>
+            <button
+              className="refresh-button"
+              onClick={refreshFriendsList}
+              title="Refresh friends list"
+            >
+              🔄
+            </button>
           </div>
 
           {friends.length === 0 ? (

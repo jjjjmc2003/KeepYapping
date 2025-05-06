@@ -137,6 +137,23 @@
   color: rgba(255, 255, 255, 0.4);
 }
 
+.refresh-button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 5px;
+  border-radius: var(--border-radius);
+  transition: all var(--transition-speed);
+}
+
+.refresh-button:hover {
+  color: white;
+  background-color: var(--background-light);
+  transform: rotate(180deg);
+}
+
 .friend-item {
   display: flex;
   align-items: center;
@@ -258,11 +275,11 @@
   .sidebar {
     width: 72px;
   }
-  
+
   .user-info, .nav-text, .friend-info {
     display: none;
   }
-  
+
   .friend-avatar, .user-avatar {
     margin-right: 0;
   }
