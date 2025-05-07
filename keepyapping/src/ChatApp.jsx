@@ -1,5 +1,5 @@
 // ChatApp.jsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, use } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
@@ -15,7 +15,11 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
   const [selectedUser, setSelectedUser] = useState("");
   const [userDisplayNames, setUserDisplayNames] = useState({});
   const messageEndRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [storageReady, setStorageReady] = useState(true);
 
+ 
+ 
   useEffect(() => {
     // Use a small timeout to ensure the DOM has updated
     const scrollTimeout = setTimeout(() => {
@@ -26,6 +30,21 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
 
     return () => clearTimeout(scrollTimeout);
   }, [messages]);
+
+  // Set up storage bucket for images
+  useEffect(() => {
+    const initializeChat = async () => {
+      try {
+        const isReady = await setUpStorage(); // Get the return value
+        setStorageReady(isReady); // Only set ready if true
+        console.log("Storage setup complete, ready:", isReady);
+      } catch (error) {
+        console.error("Error setting up storage:", error);
+        setStorageReady(false); // Make sure it's false on error
+      }
+    };
+    initializeChat();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -281,7 +300,204 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
     }
   }
 
+  // Handles image selection and upload
+  const hangleImageSelected = async (event) => {
+    const file = event.target.files[0];
+    if(!file) return;
+    if(!storageReady) {
+      alert("Storage is not ready. Please try again later.");
+      return;
+    }
 
+    if(!file.type.startsWith("image/")) {
+      alert("Please select an image file.");
+      return;
+    }
+    if (file.size> 5 * 1024 * 1024) { // 5MB limit
+      alert("File size exceeds 5MB limit.");
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const imageUrl = await uploadImage(file);
+      const messageData = {
+        text: file.name,
+        sender: userEmail,
+        type: chatMode,
+        recipient: chatMode === "group" ? "group" : selectedUser,
+        created_at: new Date().toISOString(),
+        media_url: imageUrl,
+        message_type: "image"
+      };
+
+      if (chatMode === "groupchat" && selectedGroupChat) {
+        messageData.recipient = `group:${selectedGroupChat.id}`;
+      }
+
+      const optimisticMessage = {
+        ...messageData,
+        id: `temp-${Date.now()}`, // Temporary ID
+      };
+
+      setMessages(prevMessages => [...prevMessages, optimisticMessage]);
+
+      const { error } = await supabase
+      .from("messages") 
+      .insert([messageData]); 
+
+        if (error) {
+          console.error("Error sending image message:", error);
+          setMessages(prevMessages =>
+            prevMessages.filter(msg => msg.id !== optimisticMessage.id)
+          );
+        }
+        event.target.value = null; // Reset the file input
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("Error uploading image. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+
+//handles paste event for images
+  const handlePaste = async (event) => {
+  const clipboardData = event.clipboardData; 
+  if (!clipboardData || !clipboardData.items) return;
+
+  // Check if the clipboard contains image data
+  const items = clipboardData.items;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf("image") !== -1) { // Fix: indexOf instead of indextOf
+      console.log("Image found in clipboard, uploading...");
+      event.preventDefault();
+      
+      if (!storageReady) {
+        alert("Storage is not ready. Please try again later.");
+        return;
+      }
+      //makes sure the file is an image and doesnt go over the size limit
+      const file = items[i].getAsFile();
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert("File size exceeds 5MB limit.");
+        return;
+      }
+      
+      const timestamp = Date.now();
+      const filename = `clipboard-image-${timestamp}.png`;
+      
+      // Create a named file from the clipboard file
+      const namedFile = new File([file], filename, { type: file.type });
+
+      setIsUploading(true);
+      
+      try {
+        const imageUrl = await uploadImage(namedFile);
+        const messageData = {
+          text: "Pasted image",
+          sender: userEmail,
+          type: chatMode,
+          recipient: chatMode === "group" ? "group" : selectedUser,
+          created_at: new Date().toISOString(),
+          media_url: imageUrl,
+          message_type: "image"
+        };
+        
+        if (chatMode === "groupchat" && selectedGroupChat) {
+          messageData.recipient = `group:${selectedGroupChat.id}`;
+        }
+        
+        const optimisticMessage = {
+          ...messageData,
+          id: `temp-${timestamp}`, 
+        };
+        
+        setMessages(prevMessages => [...prevMessages, optimisticMessage]);
+        
+        const { error } = await supabase.from("messages").insert([messageData]);
+        
+        if (error) {
+          console.error("Error sending pasted image message:", error);
+          setMessages(prevMessages =>
+            prevMessages.filter(msg => msg.id !== `temp-${timestamp}`)
+          );
+        }
+      } catch (error) {
+        console.error("Error uploading pasted image:", error);
+        alert("Error uploading pasted image. Please try again.");
+      } finally {
+        setIsUploading(false); 
+      }
+      break;
+    }
+  }
+
+};
+  
+
+
+  //sets up the storage bucket for images
+  const setUpStorage = async () => {
+    try {
+      console.log("Setting up storage bucket");
+      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+      console.log("Buckets:", buckets);
+      
+      if (listError) {
+        console.error("Error listing buckets:", listError);
+        throw new Error(`Failed to list buckets: ${listError.message}`);
+      }
+      
+      if (!buckets.find(bucket => bucket.name === "chat-images")) {
+        console.error("Chat images bucket not found. Please create it in the Supabase dashboard.");
+        alert("Image storage is not properly configured. Please contact an administrator.");
+        return false;
+      } else {
+        console.log("Chat images bucket exists and is ready to use");
+        return true;
+      }
+    } catch (error) {
+      console.error("Storage setup check failed:", error);
+      return false;
+    }
+  };
+
+  // Uploads the image to Supabase storage and returns the public URL
+  const uploadImage = async (file) => {
+    try {
+      const fileExtension = file.name.split(".").pop();
+      const fileName = `${Date.now()}.${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+      const filePath = `${userEmail}/${fileName}`;
+      
+      console.log("Attempting to upload file to path:", filePath);
+      
+      // Upload the image to Supabase storage
+      const { data, error } = await supabase.storage
+        .from("chat-images")
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+  
+      if (error) {
+        console.error("Upload error details:", error);
+        throw new Error("Error uploading image: " + error.message);
+      }
+  
+      console.log("File uploaded successfully, getting public URL");
+      
+      // Get the public URL of the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from("chat-images")
+        .getPublicUrl(filePath);
+      
+      return publicUrl;
+    } catch (error) {
+      console.error("Full upload error:", error);
+      throw error;
+    }
+  };
 
   // Get chat title based on chat mode
   const getChatTitle = () => {
@@ -298,14 +514,16 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
   return (
     <div
       style={{
-        maxWidth: "800px",
-        margin: "20px auto",
+        maxWidth: "90%",
+        margin: "10px auto",
+        height: "85vh",
         textAlign: "center",
         display: "flex",
         flexDirection: "column",
-        gap: "20px",
+        gap: "15px",
       }}
     >
+      {/* Header with title */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3>{getChatTitle()}</h3>
         {chatMode === "groupchat" && selectedGroupChat && onDeleteGroupChat && (
@@ -325,18 +543,19 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
           </button>
         )}
       </div>
-
+  
+      {/* Chat messages container  */}
       <div
         style={{
           flexGrow: 1,
-          height: "380px",
+          height: "calc(85vh - 130px)", 
           overflowY: "auto",
           padding: "15px",
           backgroundColor: "#2b2d31",
           display: "flex",
           flexDirection: "column",
           gap: "10px",
-          borderRadius: "10px",
+          borderRadius: "10px 10px 0 0", 
         }}
       >
         {messages.length === 0 ? (
@@ -358,48 +577,111 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
               <div style={{ fontSize: "0.75rem", fontWeight: "bold", opacity: 0.8 }}>
                 {userDisplayNames[msg.sender] || msg.sender}
               </div>
-              <div>{msg.text}</div>
+  
+              {msg.message_type === "image" ? (
+                <div>
+                  <img 
+                    src={msg.media_url} 
+                    alt={msg.text || "Shared image"}
+                    style={{ 
+                      maxWidth: "100%", 
+                      maxHeight: "300px", 
+                      borderRadius: "8px",
+                      cursor: "pointer" 
+                    }}
+                    onClick={() => window.open(msg.media_url, '_blank')}
+                  />
+                  {msg.text && <div style={{ marginTop: "5px", fontSize: "0.9rem" }}>{msg.text}</div>}
+                </div>
+              ) : (
+                <div>{msg.text}</div>
+              )}
             </div>
           ))
         )}
         <div ref={messageEndRef} />
       </div>
-
-      <div style={{ display: "flex", paddingTop: "10px" }}>
-        <input
-          type="text"
-          placeholder="Type a message..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") sendMessage();
-          }}
-          style={{
-            flexGrow: 1,
-            padding: "10px",
-            borderRadius: "8px",
-            border: "none",
-            backgroundColor: "#40444b",
-            color: "#fff",
-            fontSize: "1rem",
-          }}
-        />
-        <button
-          onClick={sendMessage}
-          style={{
+  
+      {/* Separate input area */}
+      <div 
+        style={{
+          backgroundColor: "#2b2d31",
+          padding: "12px 15px",
+          borderRadius: "0 0 10px 10px", 
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
+        {/* Message input and buttons */}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Type a message..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") sendMessage();
+            }}
+            onPaste={handlePaste}
+            style={{
+              flexGrow: 1,
+              padding: "12px",
+              borderRadius: "8px",
+              border: "none",
+              backgroundColor: "#40444b",
+              color: "#fff",
+              fontSize: "1rem",
+            }}
+          />
+          
+          <input 
+            type="file"
+            id="image-upload"
+            accept="image/*"
+            onChange={hangleImageSelected}
+            style={{display: "none"}}
+          />
+          
+          <label htmlFor="image-upload" style={{
             marginLeft: "8px",
-            padding: "10px 16px",
+            padding: "12px",
             borderRadius: "8px",
-            backgroundColor: "#5865f2",
+            backgroundColor: "#40444b",
             color: "white",
-            fontWeight: "bold",
-            border: "none",
             cursor: "pointer",
-          }}
-        >
-          Send
-        </button>
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}>
+            📷
+          </label>
+          
+          <button
+            onClick={sendMessage}
+            style={{
+              marginLeft: "8px",
+              padding: "12px 16px",
+              borderRadius: "8px",
+              backgroundColor: "#5865f2",
+              color: "white",
+              fontWeight: "bold",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Send
+          </button>
+        </div>
+        
+        {/* Upload status indicator */}
+        {isUploading && (
+          <div style={{ color: "#999", textAlign: "left" }}>
+            Uploading image...
+          </div>
+        )}
       </div>
     </div>
   );
+
 }
