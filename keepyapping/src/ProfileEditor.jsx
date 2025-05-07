@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/ProfileEditor.css";
-import avatars from "./avatars";
+import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
 
 // Supabase Setup
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
@@ -14,10 +14,13 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarId, setAvatarId] = useState(1); // Default avatar ID
+  const [customAvatarUrl, setCustomAvatarUrl] = useState(""); // URL for custom uploaded avatar
+  const [isUploading, setIsUploading] = useState(false); // Track avatar upload status
   const [originalDisplayName, setOriginalDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   const [isEditing, setIsEditing] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Fetch user profile data
   useEffect(() => {
@@ -42,6 +45,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           setOriginalDisplayName(data.displayname || "");
           setBio(data.bio || "");
           setAvatarId(data.avatar_id || 1); // Default to 1 if not set
+          setCustomAvatarUrl(data.custom_avatar_url || ""); // Get custom avatar URL if exists
         }
       } catch (err) {
         console.error("Unexpected error fetching user profile:", err);
@@ -50,6 +54,88 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
 
     fetchUserProfile();
   }, [userEmail]);
+
+  // Handle custom avatar upload
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setMessage({
+        text: "Please select an image file.",
+        type: "error"
+      });
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({
+        text: "File size exceeds 5MB limit.",
+        type: "error"
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    setMessage({ text: "Uploading avatar...", type: "info" });
+
+    try {
+      // Create a unique file name
+      const fileExtension = file.name.split(".").pop();
+      const fileName = `${Date.now()}.${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+      const filePath = `avatars/${userEmail}/${fileName}`;
+
+      // Check if avatars bucket exists, if not create it
+      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+
+      if (listError) {
+        throw new Error(`Failed to list buckets: ${listError.message}`);
+      }
+
+      if (!buckets.find(bucket => bucket.name === "avatars")) {
+        // Create the avatars bucket if it doesn't exist
+        const { error: createError } = await supabase.storage.createBucket("avatars", {
+          public: true
+        });
+
+        if (createError) {
+          throw new Error(`Failed to create avatars bucket: ${createError.message}`);
+        }
+      }
+
+      // Upload the image to Supabase storage
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        throw new Error(`Error uploading avatar: ${uploadError.message}`);
+      }
+
+      // Get the public URL of the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      // Set the custom avatar URL and select the custom avatar option
+      setCustomAvatarUrl(publicUrl);
+      setAvatarId(CUSTOM_AVATAR_ID);
+      setMessage({ text: "Avatar uploaded successfully!", type: "success" });
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      setMessage({
+        text: `Error uploading avatar: ${error.message}`,
+        type: "error"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -123,7 +209,8 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         name,
         displayname: displayName,
         bio,
-        avatar_id: avatarId
+        avatar_id: avatarId,
+        custom_avatar_url: avatarId === CUSTOM_AVATAR_ID ? customAvatarUrl : null
       };
 
       let updateResult;
@@ -142,7 +229,8 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             name,
             displayname: displayName,
             bio,
-            avatar_id: avatarId
+            avatar_id: avatarId,
+            custom_avatar_url: avatarId === CUSTOM_AVATAR_ID ? customAvatarUrl : null
           })
           .eq("email", userEmail);
       }
@@ -211,7 +299,8 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           name,
           displayname: displayName,
           bio,
-          avatar_id: avatarId
+          avatar_id: avatarId,
+          custom_avatar_url: avatarId === CUSTOM_AVATAR_ID ? customAvatarUrl : null
         });
       }
     } catch (err) {
@@ -284,8 +373,38 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
 
           <div className="form-group">
             <label>Avatar</label>
+            <div className="avatar-upload-container">
+              <input
+                type="file"
+                id="avatar-upload"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                ref={fileInputRef}
+                style={{ display: "none" }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary upload-avatar-btn"
+                onClick={() => fileInputRef.current.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? "Uploading..." : "Upload Custom Avatar"}
+              </button>
+            </div>
+
             <div className="avatar-selection">
-              {avatars.map((avatar) => (
+              {/* Custom avatar preview */}
+              {avatarId === CUSTOM_AVATAR_ID && customAvatarUrl && (
+                <div
+                  className={`avatar-option selected custom-avatar`}
+                  onClick={() => setAvatarId(CUSTOM_AVATAR_ID)}
+                >
+                  <img src={customAvatarUrl} alt="Custom Avatar" />
+                </div>
+              )}
+
+              {/* Predefined avatars */}
+              {avatars.filter(avatar => avatar.id !== CUSTOM_AVATAR_ID).map((avatar) => (
                 <div
                   key={avatar.id}
                   className={`avatar-option ${avatarId === avatar.id ? 'selected' : ''}`}
@@ -327,10 +446,14 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             <div className="field-label">Avatar:</div>
             <div className="field-value">
               <div className="current-avatar">
-                <img
-                  src={avatars.find(a => a.id === avatarId)?.url || avatars[0].url}
-                  alt="Your avatar"
-                />
+                {avatarId === CUSTOM_AVATAR_ID && customAvatarUrl ? (
+                  <img src={customAvatarUrl} alt="Your custom avatar" />
+                ) : (
+                  <img
+                    src={avatars.find(a => a.id === avatarId)?.url || avatars[0].url}
+                    alt="Your avatar"
+                  />
+                )}
               </div>
             </div>
           </div>

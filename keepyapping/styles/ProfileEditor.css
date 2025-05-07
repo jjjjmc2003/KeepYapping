@@ -171,3 +171,53 @@
   height: 100%;
   object-fit: cover;
 }
+
+.avatar-upload-container {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.upload-avatar-btn {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  background-color: var(--background-dark);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.upload-avatar-btn:hover {
+  background-color: #2a2d31;
+}
+
+.upload-avatar-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message.info {
+  background-color: rgba(88, 101, 242, 0.2);
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+}
+
+.custom-avatar {
+  position: relative;
+}
+
+.custom-avatar::after {
+  content: "Custom";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}

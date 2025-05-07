@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/FriendSystem.css";
-import avatars from "./avatars";
+import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -124,7 +124,7 @@ function FriendSystem({ currentUserEmail }) {
 
     const { data, error } = await supabase
       .from("users")
-      .select("email, name, displayname, avatar_id")
+      .select("email, name, displayname, avatar_id, custom_avatar_url")
       .eq("displayname", displayName)
       .single();
 
@@ -278,7 +278,7 @@ function FriendSystem({ currentUserEmail }) {
       const senderEmails = requestsData.map(req => req.sender_email);
       const { data: usersData, error: usersError } = await supabase
         .from("users")
-        .select("email, displayname, avatar_id")
+        .select("email, displayname, avatar_id, custom_avatar_url")
         .in("email", senderEmails);
 
       if (usersError) {
@@ -287,19 +287,26 @@ function FriendSystem({ currentUserEmail }) {
         return;
       }
 
-      // Create maps for display name and avatar ID
+      // Create maps for display name, avatar ID, and custom avatar URL
       const displayNameMap = {};
       const avatarIdMap = {};
+      const customAvatarMap = {};
       usersData.forEach(user => {
         displayNameMap[user.email] = user.displayname || user.email;
         avatarIdMap[user.email] = user.avatar_id || 1; // Default to 1 if not set
+
+        // Store custom avatar URL if it exists and avatar_id is CUSTOM_AVATAR_ID
+        if (user.avatar_id === CUSTOM_AVATAR_ID && user.custom_avatar_url) {
+          customAvatarMap[user.email] = user.custom_avatar_url;
+        }
       });
 
-      // Enhance the request data with display names and avatar IDs
+      // Enhance the request data with display names, avatar IDs, and custom avatar URLs
       const enhancedRequests = requestsData.map(req => ({
         ...req,
         sender_display_name: displayNameMap[req.sender_email] || req.sender_email,
-        sender_avatar_id: avatarIdMap[req.sender_email] || 1
+        sender_avatar_id: avatarIdMap[req.sender_email] || 1,
+        sender_custom_avatar_url: customAvatarMap[req.sender_email] || null
       }));
 
       setRequests(enhancedRequests);
@@ -479,7 +486,7 @@ function FriendSystem({ currentUserEmail }) {
         // Fetch display names and avatar IDs for all friends
         const { data: usersData, error: usersError } = await supabase
           .from("users")
-          .select("email, displayname, avatar_id")
+          .select("email, displayname, avatar_id, custom_avatar_url")
           .in("email", friendEmails);
 
         if (usersError) {
@@ -490,13 +497,22 @@ function FriendSystem({ currentUserEmail }) {
           return;
         }
 
-        // Create maps for display name and avatar ID
+        // Create maps for display name, avatar ID, and custom avatar URL
         const displayNameMap = {};
         const avatarIdMap = {};
+        const customAvatarMap = {};
         usersData.forEach(user => {
           displayNameMap[user.email] = user.displayname || user.email;
           avatarIdMap[user.email] = user.avatar_id || 1; // Default to 1 if not set
+
+          // Store custom avatar URL if it exists and avatar_id is CUSTOM_AVATAR_ID
+          if (user.avatar_id === CUSTOM_AVATAR_ID && user.custom_avatar_url) {
+            customAvatarMap[user.email] = user.custom_avatar_url;
+          }
         });
+
+        // Store custom avatar URLs in localStorage for easy access across components
+        localStorage.setItem('friendCustomAvatars', JSON.stringify(customAvatarMap));
 
         // Create enhanced friend objects with email, display name, and avatar ID
         const enhancedFriends = friendEmails.map(email => ({
@@ -801,7 +817,12 @@ function FriendSystem({ currentUserEmail }) {
           {user && (
             <div className="friend-item">
               <div className="friend-avatar">
-                {user.avatar_id ? (
+                {user.avatar_id === CUSTOM_AVATAR_ID && user.custom_avatar_url ? (
+                  <img
+                    src={user.custom_avatar_url}
+                    alt={user.displayname || user.email}
+                  />
+                ) : user.avatar_id ? (
                   <img
                     src={avatars.find(a => a.id === user.avatar_id)?.url || avatars[0].url}
                     alt={user.displayname || user.email}
@@ -869,7 +890,12 @@ function FriendSystem({ currentUserEmail }) {
           {requests.map((req) => (
             <div key={req.id} className="friend-item">
               <div className="friend-avatar">
-                {req.sender_avatar_id ? (
+                {req.sender_avatar_id === CUSTOM_AVATAR_ID && req.sender_custom_avatar_url ? (
+                  <img
+                    src={req.sender_custom_avatar_url}
+                    alt={req.sender_display_name || req.sender_email}
+                  />
+                ) : req.sender_avatar_id ? (
                   <img
                     src={avatars.find(a => a.id === req.sender_avatar_id)?.url || avatars[0].url}
                     alt={req.sender_display_name || req.sender_email}
@@ -973,7 +999,13 @@ function FriendSystem({ currentUserEmail }) {
           {friends.map((friend) => (
             <div key={typeof friend === 'object' ? friend.email : friend} className="friend-item">
               <div className="friend-avatar">
-                {typeof friend === 'object' && friend.avatarId ? (
+                {typeof friend === 'object' && friend.avatarId === CUSTOM_AVATAR_ID ? (
+                  // Get custom avatar URL from localStorage
+                  <img
+                    src={JSON.parse(localStorage.getItem('friendCustomAvatars') || '{}')[friend.email]}
+                    alt={friend.displayName || friend.email}
+                  />
+                ) : typeof friend === 'object' && friend.avatarId ? (
                   <img
                     src={avatars.find(a => a.id === friend.avatarId)?.url || avatars[0].url}
                     alt={friend.displayName || friend.email}

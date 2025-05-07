@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/GroupChatCreator.css";
-import avatars from "./avatars";
+import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
@@ -112,10 +112,10 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
       );
 
-      // Fetch display names and avatar IDs for all friends
+      // Fetch display names, avatar IDs, and custom avatar URLs for all friends
       const { data: usersData, error: usersError } = await supabase
         .from("users")
-        .select("email, displayname, avatar_id")
+        .select("email, displayname, avatar_id, custom_avatar_url")
         .in("email", friendEmails);
 
       if (usersError) {
@@ -124,15 +124,33 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         return;
       }
 
-      // Create enhanced friend objects with email, display name, and avatar ID
+      // Create enhanced friend objects with email, display name, avatar ID, and custom avatar URL
       const enhancedFriends = friendEmails.map(email => {
         const user = usersData.find(u => u.email === email);
         return {
           email: email,
           displayName: user?.displayname || email,
-          avatarId: user?.avatar_id || 1 // Default to 1 if not set
+          avatarId: user?.avatar_id || 1, // Default to 1 if not set
+          customAvatarUrl: user?.avatar_id === CUSTOM_AVATAR_ID ? user?.custom_avatar_url : null
         };
       });
+
+      // Store custom avatar URLs in localStorage for easy access across components
+      const customAvatarMap = {};
+      usersData.forEach(user => {
+        if (user.avatar_id === CUSTOM_AVATAR_ID && user.custom_avatar_url) {
+          customAvatarMap[user.email] = user.custom_avatar_url;
+        }
+      });
+
+      // Update the localStorage with any new custom avatars
+      try {
+        const existingMap = JSON.parse(localStorage.getItem('friendCustomAvatars') || '{}');
+        const updatedMap = { ...existingMap, ...customAvatarMap };
+        localStorage.setItem('friendCustomAvatars', JSON.stringify(updatedMap));
+      } catch (error) {
+        console.error("Error updating friendCustomAvatars in localStorage:", error);
+      }
 
       setFriends(enhancedFriends);
       setError("");
@@ -362,7 +380,12 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
                     }}
                   >
                     <div className="friend-avatar">
-                      {friend.avatarId ? (
+                      {friend.avatarId === CUSTOM_AVATAR_ID && friend.customAvatarUrl ? (
+                        <img
+                          src={friend.customAvatarUrl}
+                          alt={friend.displayName || friend.email}
+                        />
+                      ) : friend.avatarId ? (
                         <img
                           src={avatars.find(a => a.id === friend.avatarId)?.url || avatars[0].url}
                           alt={friend.displayName || friend.email}
@@ -390,7 +413,12 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
               {selectedFriends.map((friend) => (
                 <div key={friend.email} className="selected-friend">
                   <div className="friend-avatar">
-                    {friend.avatarId ? (
+                    {friend.avatarId === CUSTOM_AVATAR_ID && friend.customAvatarUrl ? (
+                      <img
+                        src={friend.customAvatarUrl}
+                        alt={friend.displayName || friend.email}
+                      />
+                    ) : friend.avatarId ? (
                       <img
                         src={avatars.find(a => a.id === friend.avatarId)?.url || avatars[0].url}
                         alt={friend.displayName || friend.email}

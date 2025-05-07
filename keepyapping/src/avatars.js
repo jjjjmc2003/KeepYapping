@@ -1,6 +1,15 @@
 // Avatar images from Flaticon robot collection
 // These are placeholder URLs - replace with your actual avatar images if needed
+// Special avatar type for custom uploaded avatars
+export const CUSTOM_AVATAR_ID = -1;
+
 const avatars = [
+  // Special entry for custom uploaded avatars
+  {
+    id: CUSTOM_AVATAR_ID,
+    name: "Custom Avatar",
+    url: "" // URL will be set dynamically
+  },
   // Original set
   {
     id: 1,

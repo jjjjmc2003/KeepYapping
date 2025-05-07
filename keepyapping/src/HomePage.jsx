@@ -6,7 +6,7 @@ import ChatApp from "./ChatApp";
 import FriendSystem from "./FriendSystem";
 import ProfileEditor from "./ProfileEditor";
 import GroupChatCreator from "./GroupChatCreator";
-import avatars from "./avatars";
+import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
@@ -17,6 +17,7 @@ function HomePage({ onLogout }) {
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userAvatarId, setUserAvatarId] = useState(1); // Default avatar ID
+  const [userCustomAvatarUrl, setUserCustomAvatarUrl] = useState(""); // Custom avatar URL
   const [friends, setFriends] = useState([]);
   const [friendDisplayNames, setFriendDisplayNames] = useState({});
   const [friendAvatarIds, setFriendAvatarIds] = useState({});
@@ -47,6 +48,7 @@ function HomePage({ onLogout }) {
       if (userData) {
         setUserName(userData.displayname || userData.name || userData.email);
         setUserAvatarId(userData.avatar_id || 1); // Default to 1 if not set
+        setUserCustomAvatarUrl(userData.custom_avatar_url || ""); // Get custom avatar URL if exists
       }
     }
 
@@ -171,17 +173,26 @@ function HomePage({ onLogout }) {
 
     const { data: users } = await supabase
       .from("users")
-      .select("email, displayname, avatar_id")
+      .select("email, displayname, avatar_id, custom_avatar_url")
       .in("email", emails);
 
     const nameMap = {};
     const avatarMap = {};
+    const customAvatarMap = {};
     users?.forEach(u => {
       nameMap[u.email] = u.displayname || u.email;
       avatarMap[u.email] = u.avatar_id || 1; // Default to 1 if not set
+
+      // Store custom avatar URLs in a separate state
+      if (u.avatar_id === CUSTOM_AVATAR_ID && u.custom_avatar_url) {
+        customAvatarMap[u.email] = u.custom_avatar_url;
+      }
     });
     setFriendDisplayNames(nameMap);
     setFriendAvatarIds(avatarMap);
+
+    // Store custom avatar URLs in localStorage for easy access across components
+    localStorage.setItem('friendCustomAvatars', JSON.stringify(customAvatarMap));
 
     // Apply search filter if there's an active search
     if (searchTerm) {
@@ -323,6 +334,11 @@ function HomePage({ onLogout }) {
     // Update avatar ID if provided
     if (profileData.avatar_id) {
       setUserAvatarId(profileData.avatar_id);
+    }
+
+    // Update custom avatar URL if provided
+    if (profileData.custom_avatar_url !== undefined) {
+      setUserCustomAvatarUrl(profileData.custom_avatar_url);
     }
 
     // Refresh friends list to update any display name changes
@@ -508,7 +524,12 @@ function HomePage({ onLogout }) {
       <div className="sidebar">
         <div className="user-profile">
           <div className="user-avatar">
-            {userAvatarId ? (
+            {userAvatarId === CUSTOM_AVATAR_ID && userCustomAvatarUrl ? (
+              <img
+                src={userCustomAvatarUrl}
+                alt={userName}
+              />
+            ) : userAvatarId ? (
               <img
                 src={avatars.find(a => a.id === userAvatarId)?.url || avatars[0].url}
                 alt={userName}
@@ -579,7 +600,13 @@ function HomePage({ onLogout }) {
               setActiveSection("chat");
             }}>
               <div className="friend-avatar">
-                {friendAvatarIds[friend] ? (
+                {friendAvatarIds[friend] === CUSTOM_AVATAR_ID ? (
+                  // Get custom avatar URL from localStorage
+                  <img
+                    src={JSON.parse(localStorage.getItem('friendCustomAvatars') || '{}')[friend]}
+                    alt={friendDisplayNames[friend] || friend}
+                  />
+                ) : friendAvatarIds[friend] ? (
                   <img
                     src={avatars.find(a => a.id === friendAvatarIds[friend])?.url || avatars[0].url}
                     alt={friendDisplayNames[friend] || friend}
