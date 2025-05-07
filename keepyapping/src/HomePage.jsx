@@ -155,9 +155,15 @@ function HomePage({ onLogout }) {
       );
     }
     return (
-      <div className="welcome-message">
-        <h1>Welcome to KeepYapping!</h1>
-        <p>Connect with friends, chat with your organization, and create private groups.</p>
+      <div className="home-content">
+        <div className="welcome-message">
+          <h1>Welcome to KeepYapping!</h1>
+          <p>Connect with friends, chat with your organization, and create private groups.</p>
+        </div>
+        <ProfileEditor
+          userEmail={userEmail}
+          onProfileUpdate={handleProfileUpdate}
+        />
       </div>
     );
   };

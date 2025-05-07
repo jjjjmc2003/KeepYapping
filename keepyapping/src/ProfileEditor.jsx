@@ -55,15 +55,46 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
     setMessage({ text: "", type: "" });
 
     try {
+      // Check if user is authenticated
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (!sessionData.session) {
+        setMessage({
+          text: "You must be logged in to update your profile.",
+          type: "error"
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Check if user exists in the users table
+      const { error: userCheckError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", userEmail)
+        .single();
+
+      if (userCheckError && userCheckError.code !== "PGRST116") {
+        console.error("Error checking if user exists:", userCheckError);
+        setMessage({
+          text: "An error occurred while checking your profile. Please try again.",
+          type: "error"
+        });
+        setLoading(false);
+        return;
+      }
+
+      const userExists = !userCheckError;
+
       // Validate display name uniqueness if it has changed
       if (displayName !== originalDisplayName) {
         const { data: existingDisplayName, error: displayNameError } = await supabase
           .from("users")
-          .select("displayname")
+          .select("displayname, email")
           .eq("displayname", displayName)
           .single();
 
-        if (existingDisplayName) {
+        if (existingDisplayName && existingDisplayName.email !== userEmail) {
           setMessage({
             text: "This display name is already taken. Please choose another one.",
             type: "error"
@@ -83,15 +114,35 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         }
       }
 
-      // Update user profile in the users table
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          name,
-          displayname: displayName,
-          bio
-        })
-        .eq("email", userEmail);
+      // Prepare the user data
+      const userData = {
+        email: userEmail,
+        name,
+        displayname: displayName,
+        bio
+      };
+
+      let updateResult;
+
+      // Insert or update based on whether user exists
+      if (!userExists) {
+        // Insert new user
+        updateResult = await supabase
+          .from("users")
+          .insert([userData]);
+      } else {
+        // Update existing user
+        updateResult = await supabase
+          .from("users")
+          .update({
+            name,
+            displayname: displayName,
+            bio
+          })
+          .eq("email", userEmail);
+      }
+
+      const { error: updateError } = updateResult;
 
       if (updateError) {
         console.error("Error updating user profile:", updateError);
@@ -103,29 +154,52 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         return;
       }
 
-      // If display name has changed, update it in friend_requests table
+      // If display name has changed, check if friend_requests table has display name columns
       if (displayName !== originalDisplayName) {
-        // Update sender_email entries
-        await supabase
-          .from("friend_requests")
-          .update({ sender_display_name: displayName })
-          .eq("sender_email", userEmail);
+        try {
+          // Check if the friend_requests table has the expected columns
+          const { data: tableInfo } = await supabase
+            .from("friend_requests")
+            .select("*")
+            .limit(1);
 
-        // Update receiver_email entries
-        await supabase
-          .from("friend_requests")
-          .update({ receiver_display_name: displayName })
-          .eq("receiver_email", userEmail);
+          // Get the column names from the first row if available
+          const columnNames = tableInfo && tableInfo.length > 0 ? Object.keys(tableInfo[0]) : [];
+
+          // Check if the sender_display_name column exists
+          const hasSenderDisplayName = columnNames.includes("sender_display_name");
+          const hasReceiverDisplayName = columnNames.includes("receiver_display_name");
+
+          // Only update if the columns exist
+          if (hasSenderDisplayName) {
+            // Update sender_email entries
+            await supabase
+              .from("friend_requests")
+              .update({ sender_display_name: displayName })
+              .eq("sender_email", userEmail);
+          }
+
+          if (hasReceiverDisplayName) {
+            // Update receiver_email entries
+            await supabase
+              .from("friend_requests")
+              .update({ receiver_display_name: displayName })
+              .eq("receiver_email", userEmail);
+          }
+        } catch (friendRequestError) {
+          console.error("Error updating friend_requests:", friendRequestError);
+          // Don't fail the whole operation if friend_requests update fails
+        }
       }
 
       setMessage({
         text: "Profile updated successfully!",
         type: "success"
       });
-      
+
       setOriginalDisplayName(displayName);
       setIsEditing(false);
-      
+
       // Notify parent component about the update
       if (onProfileUpdate) {
         onProfileUpdate({
@@ -150,7 +224,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
       <div className="profile-editor-header">
         <h2>Your Profile</h2>
         {!isEditing && (
-          <button 
+          <button
             className="btn btn-primary edit-profile-btn"
             onClick={() => setIsEditing(true)}
           >
