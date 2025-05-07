@@ -240,7 +240,8 @@ function FriendSystem({ currentUserEmail }) {
         status: "pending"
       });
 
-      const { data, error } = await supabase
+      // Get pending friend requests
+      const { data: requestsData, error } = await supabase
         .from("friend_requests")
         .select("*")
         .ilike("receiver_email", currentUserEmail) // case-insensitive match
@@ -252,25 +253,52 @@ function FriendSystem({ currentUserEmail }) {
         return;
       }
 
-      console.log("Friend request data from Supabase:", data);
+      console.log("Friend request data from Supabase:", requestsData);
 
       // Check if data is null or undefined
-      if (!data) {
+      if (!requestsData) {
         setRequestError("Warning: No data returned from the database.");
         setRequests([]);
         return;
       }
 
       // Check if data is empty
-      if (data.length === 0) {
+      if (requestsData.length === 0) {
         console.log("No pending friend requests found for user:", currentUserEmail);
         setRequestError(""); // Clear any previous errors
+        setRequests([]);
+        return;
       } else {
-        console.log(`Found ${data.length} pending friend requests`);
+        console.log(`Found ${requestsData.length} pending friend requests`);
         setRequestError(""); // Clear any previous errors
       }
 
-      setRequests(data);
+      // Fetch display names for all senders
+      const senderEmails = requestsData.map(req => req.sender_email);
+      const { data: usersData, error: usersError } = await supabase
+        .from("users")
+        .select("email, displayname")
+        .in("email", senderEmails);
+
+      if (usersError) {
+        console.error("Error fetching user display names:", usersError);
+        setRequests(requestsData); // Fall back to using just the request data
+        return;
+      }
+
+      // Create a map of email to display name
+      const displayNameMap = {};
+      usersData.forEach(user => {
+        displayNameMap[user.email] = user.displayname || user.email;
+      });
+
+      // Enhance the request data with display names
+      const enhancedRequests = requestsData.map(req => ({
+        ...req,
+        sender_display_name: displayNameMap[req.sender_email] || req.sender_email
+      }));
+
+      setRequests(enhancedRequests);
     } catch (unexpectedError) {
       console.error("Unexpected error in fetchFriendRequests:", unexpectedError);
       setRequestError(`Unexpected error: ${unexpectedError.message || "Unknown error occurred"}`);
@@ -331,14 +359,21 @@ function FriendSystem({ currentUserEmail }) {
       return;
     }
 
+    // Get the display name if available
+    let displayName = friendEmail;
+    const friendObj = friends.find(f => typeof f === 'object' && f.email === friendEmail);
+    if (friendObj && friendObj.displayName) {
+      displayName = friendObj.displayName;
+    }
+
     // Show confirmation dialog
-    const confirmed = window.confirm(`Are you sure you want to remove ${friendEmail} from your friends list?`);
+    const confirmed = window.confirm(`Are you sure you want to remove ${displayName} from your friends list?`);
     if (!confirmed) {
       return; // User cancelled the operation
     }
 
     try {
-      console.log(`Removing friend: ${friendEmail}`);
+      console.log(`Removing friend: ${friendEmail} (${displayName})`);
 
       // Find the friend request record(s) between these two users
       const { data, error: fetchError } = await supabase
@@ -373,10 +408,10 @@ function FriendSystem({ currentUserEmail }) {
         }
       }
 
-      console.log(`Successfully removed friend: ${friendEmail}`);
+      console.log(`Successfully removed friend: ${displayName}`);
 
       // Show a temporary success message
-      setFriendError(`Successfully removed ${friendEmail} from your friends list!`);
+      setFriendError(`Successfully removed ${displayName} from your friends list!`);
       setTimeout(() => {
         setFriendError("");
       }, 3000);
@@ -401,7 +436,7 @@ function FriendSystem({ currentUserEmail }) {
     try {
       console.log("Fetching accepted friends for:", currentUserEmail);
 
-      const { data, error } = await supabase
+      const { data: requestsData, error } = await supabase
         .from("friend_requests")
         .select("*")
         .or(`sender_email.eq.${currentUserEmail},receiver_email.eq.${currentUserEmail}`)
@@ -414,17 +449,17 @@ function FriendSystem({ currentUserEmail }) {
       }
 
       // Check if data is null or undefined
-      if (!data) {
+      if (!requestsData) {
         console.error("No data returned when fetching friends");
         setFriendError("Warning: No data returned from the database.");
         setFriends([]);
         return;
       }
 
-      console.log("Accepted friends data from Supabase:", data);
+      console.log("Accepted friends data from Supabase:", requestsData);
 
       // Check if data is empty
-      if (data.length === 0) {
+      if (requestsData.length === 0) {
         console.log("No accepted friends found for user:", currentUserEmail);
         setFriendError(""); // Clear any previous errors
         setFriends([]);
@@ -432,12 +467,39 @@ function FriendSystem({ currentUserEmail }) {
       }
 
       try {
-        const friendList = data.map((req) =>
+        // Extract friend emails
+        const friendEmails = requestsData.map((req) =>
           req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
         );
 
-        console.log("Processed friend list:", friendList);
-        setFriends(friendList);
+        // Fetch display names for all friends
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("email, displayname")
+          .in("email", friendEmails);
+
+        if (usersError) {
+          console.error("Error fetching friend display names:", usersError);
+          // Fall back to just using emails
+          setFriends(friendEmails);
+          setFriendError("");
+          return;
+        }
+
+        // Create a map of email to display name
+        const displayNameMap = {};
+        usersData.forEach(user => {
+          displayNameMap[user.email] = user.displayname || user.email;
+        });
+
+        // Create enhanced friend objects with both email and display name
+        const enhancedFriends = friendEmails.map(email => ({
+          email: email,
+          displayName: displayNameMap[email] || email
+        }));
+
+        console.log("Processed friend list with display names:", enhancedFriends);
+        setFriends(enhancedFriends);
         setFriendError("");
       } catch (mapError) {
         console.error("Error processing friend data:", mapError);
@@ -541,7 +603,7 @@ function FriendSystem({ currentUserEmail }) {
     try {
       console.log("Fetching outgoing friend requests for:", currentUserEmail);
 
-      const { data, error } = await supabase
+      const { data: requestsData, error } = await supabase
         .from("friend_requests")
         .select("*")
         .ilike("sender_email", currentUserEmail)
@@ -553,8 +615,40 @@ function FriendSystem({ currentUserEmail }) {
         return;
       }
 
-      console.log("Outgoing friend requests:", data);
-      setOutgoingRequests(data || []);
+      console.log("Outgoing friend requests:", requestsData);
+
+      if (!requestsData || requestsData.length === 0) {
+        setOutgoingRequests([]);
+        setOutgoingRequestsError("");
+        return;
+      }
+
+      // Fetch display names for all receivers
+      const receiverEmails = requestsData.map(req => req.receiver_email);
+      const { data: usersData, error: usersError } = await supabase
+        .from("users")
+        .select("email, displayname")
+        .in("email", receiverEmails);
+
+      if (usersError) {
+        console.error("Error fetching user display names:", usersError);
+        setOutgoingRequests(requestsData); // Fall back to using just the request data
+        return;
+      }
+
+      // Create a map of email to display name
+      const displayNameMap = {};
+      usersData.forEach(user => {
+        displayNameMap[user.email] = user.displayname || user.email;
+      });
+
+      // Enhance the request data with display names
+      const enhancedRequests = requestsData.map(req => ({
+        ...req,
+        receiver_display_name: displayNameMap[req.receiver_email] || req.receiver_email
+      }));
+
+      setOutgoingRequests(enhancedRequests);
       setOutgoingRequestsError("");
     } catch (error) {
       console.error("Unexpected error fetching outgoing requests:", error);
@@ -725,10 +819,15 @@ function FriendSystem({ currentUserEmail }) {
           {requests.map((req) => (
             <div key={req.id} className="friend-item">
               <div className="friend-avatar">
-                {req.sender_email.charAt(0).toUpperCase()}
+                {(req.sender_display_name || req.sender_email).charAt(0).toUpperCase()}
               </div>
               <div className="friend-info">
-                <div className="friend-name">{req.sender_email}</div>
+                <div className="friend-name">
+                  {req.sender_display_name || req.sender_email}
+                  {req.sender_display_name && req.sender_display_name !== req.sender_email && (
+                    <span className="friend-email">({req.sender_email})</span>
+                  )}
+                </div>
                 <div className="friend-status">Wants to add you as a friend</div>
               </div>
               <div className="friend-actions">
@@ -772,10 +871,15 @@ function FriendSystem({ currentUserEmail }) {
           {outgoingRequests.map((req) => (
             <div key={req.id} className="friend-item">
               <div className="friend-avatar">
-                {req.receiver_email.charAt(0).toUpperCase()}
+                {(req.receiver_display_name || req.receiver_email).charAt(0).toUpperCase()}
               </div>
               <div className="friend-info">
-                <div className="friend-name">{req.receiver_email}</div>
+                <div className="friend-name">
+                  {req.receiver_display_name || req.receiver_email}
+                  {req.receiver_display_name && req.receiver_display_name !== req.receiver_email && (
+                    <span className="friend-email">({req.receiver_email})</span>
+                  )}
+                </div>
                 <div className="friend-status">Request pending</div>
               </div>
             </div>
@@ -803,18 +907,27 @@ function FriendSystem({ currentUserEmail }) {
           )}
 
           {friends.map((friend) => (
-            <div key={friend} className="friend-item">
+            <div key={typeof friend === 'object' ? friend.email : friend} className="friend-item">
               <div className="friend-avatar">
-                {friend.charAt(0).toUpperCase()}
+                {typeof friend === 'object'
+                  ? (friend.displayName || friend.email).charAt(0).toUpperCase()
+                  : friend.charAt(0).toUpperCase()}
               </div>
               <div className="friend-info">
-                <div className="friend-name">{friend}</div>
+                <div className="friend-name">
+                  {typeof friend === 'object'
+                    ? friend.displayName || friend.email
+                    : friend}
+                  {typeof friend === 'object' && friend.displayName && friend.displayName !== friend.email && (
+                    <span className="friend-email">({friend.email})</span>
+                  )}
+                </div>
                 <div className="friend-status">Online</div>
               </div>
               <div className="friend-actions">
                 <button
                   className="btn btn-danger btn-remove-friend"
-                  onClick={() => removeFriend(friend)}
+                  onClick={() => removeFriend(typeof friend === 'object' ? friend.email : friend)}
                   title="Remove friend"
                 >
                   X
