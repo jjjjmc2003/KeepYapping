@@ -526,26 +526,62 @@ function FriendSystem({ currentUserEmail }) {
     fetchFriends();
     fetchOutgoingRequests();
 
-    // Set up real-time subscription for friend request changes
-    const subscription = supabase
-      .channel("friend-requests")
+    // Set up periodic refresh for friend data
+    const refreshInterval = setInterval(() => {
+      console.log("Periodic refresh of friend data in FriendSystem");
+      fetchFriendRequests();
+      fetchFriends();
+      fetchOutgoingRequests();
+    }, 5000); // Refresh every 5 seconds
+
+    // Create unique channel names for this user
+    const userPrefix = currentUserEmail.replace(/[^a-zA-Z0-9]/g, '');
+
+    // Set up real-time subscription for incoming friend requests
+    const incomingRequestsSub = supabase
+      .channel(`incoming-requests-${userPrefix}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "friend_requests" },
+        {
+          event: "*",
+          schema: "public",
+          table: "friend_requests",
+          filter: `receiver_email=eq.${currentUserEmail}`
+        },
         (payload) => {
-          console.log("Friend request change detected:", payload);
+          console.log("Incoming friend request change detected:", payload);
           fetchFriendRequests();
           fetchFriends();
-          fetchOutgoingRequests();
         }
       )
       .subscribe();
 
-    console.log("Supabase real-time subscription set up for friend requests");
+    // Set up real-time subscription for outgoing friend requests
+    const outgoingRequestsSub = supabase
+      .channel(`outgoing-requests-${userPrefix}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "friend_requests",
+          filter: `sender_email=eq.${currentUserEmail}`
+        },
+        (payload) => {
+          console.log("Outgoing friend request change detected:", payload);
+          fetchOutgoingRequests();
+          fetchFriends();
+        }
+      )
+      .subscribe();
+
+    console.log("Supabase real-time subscriptions set up for friend requests");
 
     return () => {
-      console.log("Cleaning up Supabase subscription");
-      supabase.removeChannel(subscription);
+      console.log("Cleaning up Supabase subscriptions and interval");
+      clearInterval(refreshInterval);
+      supabase.removeChannel(incomingRequestsSub);
+      supabase.removeChannel(outgoingRequestsSub);
     };
   }, [currentUserEmail]); // Re-run when currentUserEmail changes
 
@@ -797,9 +833,6 @@ function FriendSystem({ currentUserEmail }) {
         <div className="friend-section">
           <div className="friend-section-header">
             <h3>Incoming Friend Requests</h3>
-            <button className="btn btn-secondary" onClick={refreshFriendData}>
-              Refresh
-            </button>
           </div>
 
           {requestError && (
@@ -991,6 +1024,13 @@ function FriendSystem({ currentUserEmail }) {
                   onClick={fetchAllFriendRequests}
                 >
                   Fetch All Requests
+                </button>
+
+                <button
+                  className="btn btn-secondary"
+                  onClick={refreshFriendData}
+                >
+                  Manual Refresh
                 </button>
               </div>
 

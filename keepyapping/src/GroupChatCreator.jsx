@@ -174,34 +174,58 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
     }
 
     try {
-      // Create a new group chat object
-      const newGroupChat = {
-        id: Date.now(), // Use timestamp as ID
-        name: groupName,
-        created_by: currentUserEmail,
-        created_at: new Date().toISOString(),
-        members: [
-          currentUserEmail,
-          ...selectedFriends.map(friend => friend.email)
-        ]
-      };
+      console.log("Creating group chat with name:", groupName);
+      console.log("Selected friends:", selectedFriends);
 
-      // Save to localStorage
-      try {
-        const storedGroupChats = localStorage.getItem('groupChats') || '[]';
-        const parsedGroupChats = JSON.parse(storedGroupChats);
+      // 1. First, insert into the group_chats table
+      const { data: groupChatData, error: groupChatError } = await supabase
+        .from("group_chats")
+        .insert([{
+          name: groupName,
+          creator: currentUserEmail,
+          created_at: new Date().toISOString()
+        }])
+        .select();
 
-        // Add the new group chat
-        parsedGroupChats.push(newGroupChat);
-
-        // Save back to localStorage
-        localStorage.setItem('groupChats', JSON.stringify(parsedGroupChats));
-        console.log("Saved new group chat to localStorage:", newGroupChat);
-      } catch (storageError) {
-        console.error("Error saving to localStorage:", storageError);
+      if (groupChatError) {
+        console.error("Error creating group chat:", groupChatError);
+        setError("Failed to create group chat: " + groupChatError.message);
+        return;
       }
 
-      // Send welcome messages to the group chat to make it visible to all members
+      if (!groupChatData || groupChatData.length === 0) {
+        console.error("No group chat data returned after insert");
+        setError("Failed to create group chat: No data returned");
+        return;
+      }
+
+      const newGroupChat = groupChatData[0];
+      console.log("Created group chat:", newGroupChat);
+
+      // 2. Add all members (including creator) to group_chat_members table
+      const memberInserts = [
+        // Add creator
+        {
+          group_id: newGroupChat.id,
+          member_email: currentUserEmail
+        },
+        // Add all selected friends
+        ...selectedFriends.map(friend => ({
+          group_id: newGroupChat.id,
+          member_email: friend.email
+        }))
+      ];
+
+      const { error: membersError } = await supabase
+        .from("group_chat_members")
+        .insert(memberInserts);
+
+      if (membersError) {
+        console.error("Error adding members to group chat:", membersError);
+        // Don't return here, we'll continue anyway to send messages
+      }
+
+      // 3. Send welcome messages to the group chat to make it visible to all members
       // First, send a creation message
       const creationMessage = {
         text: `Created group chat "${groupName}"`,
@@ -224,12 +248,10 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
       }
 
       // Then send individual messages for each member (to trigger notifications)
-      for (const memberEmail of newGroupChat.members) {
-        if (memberEmail === currentUserEmail) continue; // Skip creator
-
+      for (const friend of selectedFriends) {
         // Send a message from the creator to establish the group chat
         const addMemberMessage = {
-          text: `Added ${memberEmail} to the group chat`,
+          text: `Added ${friend.email} to the group chat`,
           sender: currentUserEmail,
           type: "groupchat",
           recipient: `group:${newGroupChat.id}`,
@@ -242,11 +264,34 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
             .insert([addMemberMessage]);
 
           if (msgError) {
-            console.error(`Error sending add member message for ${memberEmail}:`, msgError);
+            console.error(`Error sending add member message for ${friend.email}:`, msgError);
           }
         } catch (error) {
-          console.error(`Error sending add member message for ${memberEmail}:`, error);
+          console.error(`Error sending add member message for ${friend.email}:`, error);
         }
+      }
+
+      // 4. Also save to localStorage for backward compatibility
+      try {
+        const storedGroupChats = localStorage.getItem('groupChats') || '[]';
+        const parsedGroupChats = JSON.parse(storedGroupChats);
+
+        // Add the new group chat with members
+        const groupChatForStorage = {
+          ...newGroupChat,
+          members: [
+            currentUserEmail,
+            ...selectedFriends.map(friend => friend.email)
+          ]
+        };
+
+        parsedGroupChats.push(groupChatForStorage);
+
+        // Save back to localStorage
+        localStorage.setItem('groupChats', JSON.stringify(parsedGroupChats));
+        console.log("Saved new group chat to localStorage:", groupChatForStorage);
+      } catch (storageError) {
+        console.error("Error saving to localStorage:", storageError);
       }
 
       // Success
@@ -266,7 +311,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
       }, 3000);
     } catch (error) {
       console.error("Unexpected error creating group chat:", error);
-      setError("An unexpected error occurred");
+      setError("An unexpected error occurred: " + error.message);
     }
   };
 

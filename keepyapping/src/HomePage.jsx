@@ -185,97 +185,88 @@ function HomePage({ onLogout }) {
   // Function to initialize group chat state
   const initializeGroupChats = async () => {
     try {
-      console.log("Initializing group chats...");
+      console.log("Initializing group chats for user:", userEmail);
 
-      // Instead of just using localStorage, let's use Supabase for group chats
-      // First, check if we have a group_chats table in Supabase
-      const { data: groupChatsData, error: groupChatsError } = await supabase
-        .from("messages")
-        .select("recipient")
-        .like("recipient", "group:%")
-        .limit(1);
-
-      if (groupChatsError) {
-        console.error("Error checking for group chats:", groupChatsError);
+      if (!userEmail) {
+        console.log("No user email available, skipping group chat initialization");
+        return false;
       }
 
-      // If we have group chats in Supabase, use them
-      if (groupChatsData && groupChatsData.length > 0) {
-        console.log("Found group chats in Supabase");
+      // 1. Get all group chats where the user is a member using the group_chat_members table
+      const { data: memberData, error: memberError } = await supabase
+        .from("group_chat_members")
+        .select("group_id")
+        .eq("member_email", userEmail);
 
-        // Get all unique group chat IDs from messages
-        const { data: groupMessages, error: messagesError } = await supabase
-          .from("messages")
-          .select("recipient, text, sender")
-          .like("recipient", "group:%");
+      if (memberError) {
+        console.error("Error fetching group chat memberships:", memberError);
+        return false;
+      }
 
-        if (messagesError) {
-          console.error("Error fetching group messages:", messagesError);
-          return false;
+      if (!memberData || memberData.length === 0) {
+        console.log("User is not a member of any group chats");
+        setGroupChats([]);
+        setFilteredGroupChats([]);
+        return true;
+      }
+
+      // Extract group IDs
+      const groupIds = memberData.map(item => item.group_id);
+      console.log("User is a member of group chats with IDs:", groupIds);
+
+      // 2. Get details for these group chats
+      const { data: groupChatsData, error: groupChatsError } = await supabase
+        .from("group_chats")
+        .select("*")
+        .in("id", groupIds);
+
+      if (groupChatsError) {
+        console.error("Error fetching group chat details:", groupChatsError);
+        return false;
+      }
+
+      if (!groupChatsData || groupChatsData.length === 0) {
+        console.log("No group chat details found");
+        setGroupChats([]);
+        setFilteredGroupChats([]);
+        return true;
+      }
+
+      console.log("Fetched group chat details:", groupChatsData);
+
+      // 3. For each group chat, get its members
+      const enhancedGroupChats = await Promise.all(groupChatsData.map(async (chat) => {
+        // Get members for this group chat
+        const { data: chatMembers, error: membersError } = await supabase
+          .from("group_chat_members")
+          .select("member_email")
+          .eq("group_id", chat.id);
+
+        if (membersError) {
+          console.error(`Error fetching members for group chat ${chat.id}:`, membersError);
+          return {
+            ...chat,
+            members: [userEmail] // Default to just the current user
+          };
         }
 
-        // Extract group IDs and create group chat objects
-        const groupChatMap = {};
+        return {
+          ...chat,
+          members: chatMembers.map(m => m.member_email)
+        };
+      }));
 
-        groupMessages.forEach(msg => {
-          const groupId = msg.recipient.replace("group:", "");
-          if (!groupChatMap[groupId]) {
-            groupChatMap[groupId] = {
-              id: parseInt(groupId),
-              name: `Group Chat ${groupId}`, // Default name
-              created_by: msg.sender,
-              members: []
-            };
-          }
-        });
+      console.log("Enhanced group chats with members:", enhancedGroupChats);
 
-        // Check localStorage for additional group chat info
-        const storedGroupChats = localStorage.getItem('groupChats');
-        if (storedGroupChats) {
-          const parsedGroupChats = JSON.parse(storedGroupChats);
+      // 4. Update state with the group chats
+      setGroupChats(enhancedGroupChats);
+      setFilteredGroupChats(enhancedGroupChats);
 
-          // Merge with data from localStorage
-          parsedGroupChats.forEach(chat => {
-            if (groupChatMap[chat.id]) {
-              // Update existing chat with more info
-              groupChatMap[chat.id].name = chat.name;
-              groupChatMap[chat.id].members = chat.members;
-            } else {
-              // Add new chat
-              groupChatMap[chat.id] = chat;
-            }
-          });
-        }
-
-        // Convert to array and filter to only include chats where user is a member
-        const allGroupChats = Object.values(groupChatMap);
-        const userGroupChats = allGroupChats.filter(chat =>
-          chat.members && chat.members.includes(userEmail)
-        );
-
-        setGroupChats(userGroupChats);
-        setFilteredGroupChats(userGroupChats);
-        console.log("Loaded group chats:", userGroupChats);
-      } else {
-        // No group chats in Supabase, check localStorage
-        const storedGroupChats = localStorage.getItem('groupChats');
-        if (storedGroupChats) {
-          const parsedGroupChats = JSON.parse(storedGroupChats);
-
-          // Filter to only include group chats where the user is a member
-          const userGroupChats = parsedGroupChats.filter(chat =>
-            chat.members && chat.members.includes(userEmail)
-          );
-
-          setGroupChats(userGroupChats);
-          setFilteredGroupChats(userGroupChats);
-          console.log("Loaded group chats from localStorage:", userGroupChats);
-        } else {
-          // Initialize with empty array
-          localStorage.setItem('groupChats', JSON.stringify([]));
-          setGroupChats([]);
-          setFilteredGroupChats([]);
-        }
+      // 5. Also update localStorage for backward compatibility
+      try {
+        localStorage.setItem('groupChats', JSON.stringify(enhancedGroupChats));
+      } catch (storageError) {
+        console.error("Error saving group chats to localStorage:", storageError);
       }
 
       return true;
@@ -361,32 +352,27 @@ function HomePage({ onLogout }) {
 
   // Handle group chat deletion
   const handleDeleteGroupChat = async (groupChatId) => {
-    if (!window.confirm("Are you sure you want to delete this group chat? This action cannot be undone.")) {
+    // Find the group chat
+    const groupChat = groupChats.find(chat => chat.id === groupChatId);
+    if (!groupChat) {
+      console.error("Group chat not found:", groupChatId);
+      return;
+    }
+
+    // Check if the current user is the creator
+    if (groupChat.creator !== userEmail) {
+      alert("Only the creator of the group chat can delete it");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete the group chat "${groupChat.name}"? This action cannot be undone.`)) {
       return;
     }
 
     try {
-      // Delete from localStorage
-      try {
-        const storedGroupChats = localStorage.getItem('groupChats') || '[]';
-        const parsedGroupChats = JSON.parse(storedGroupChats);
+      console.log("Deleting group chat:", groupChatId);
 
-        // Filter out the deleted group chat
-        const updatedGroupChats = parsedGroupChats.filter(chat => chat.id !== groupChatId);
-
-        // Save back to localStorage
-        localStorage.setItem('groupChats', JSON.stringify(updatedGroupChats));
-        console.log("Removed group chat from localStorage:", groupChatId);
-
-        // Dispatch a custom event to notify other components
-        window.dispatchEvent(new CustomEvent('groupChatUpdate', {
-          detail: { type: 'delete', chatId: groupChatId }
-        }));
-      } catch (storageError) {
-        console.error("Error updating localStorage:", storageError);
-      }
-
-      // Send a message to the group chat to notify members it's been deleted
+      // 1. First, send a deletion notification message
       try {
         const deleteMessage = {
           text: `Group chat deleted by ${userEmail}`,
@@ -406,7 +392,54 @@ function HomePage({ onLogout }) {
         // Not critical, continue anyway
       }
 
-      // Update state
+      // 2. Delete members from group_chat_members table
+      const { error: membersError } = await supabase
+        .from("group_chat_members")
+        .delete()
+        .eq("group_id", groupChatId);
+
+      if (membersError) {
+        console.error("Error deleting group chat members:", membersError);
+        // Continue anyway
+      } else {
+        console.log("Deleted group chat members successfully");
+      }
+
+      // 3. Delete the group chat from group_chats table
+      const { error: chatError } = await supabase
+        .from("group_chats")
+        .delete()
+        .eq("id", groupChatId);
+
+      if (chatError) {
+        console.error("Error deleting group chat:", chatError);
+        alert("Failed to delete group chat: " + chatError.message);
+        return;
+      }
+
+      console.log("Deleted group chat successfully from database");
+
+      // 4. Update localStorage for backward compatibility
+      try {
+        const storedGroupChats = localStorage.getItem('groupChats') || '[]';
+        const parsedGroupChats = JSON.parse(storedGroupChats);
+
+        // Filter out the deleted group chat
+        const updatedGroupChats = parsedGroupChats.filter(chat => chat.id !== groupChatId);
+
+        // Save back to localStorage
+        localStorage.setItem('groupChats', JSON.stringify(updatedGroupChats));
+        console.log("Updated localStorage after group chat deletion");
+
+        // Dispatch a custom event to notify other components
+        window.dispatchEvent(new CustomEvent('groupChatUpdate', {
+          detail: { type: 'delete', chatId: groupChatId }
+        }));
+      } catch (storageError) {
+        console.error("Error updating localStorage:", storageError);
+      }
+
+      // 5. Update state
       setGroupChats(prev => prev.filter(chat => chat.id !== groupChatId));
       setFilteredGroupChats(prev => prev.filter(chat => chat.id !== groupChatId));
 
@@ -418,7 +451,7 @@ function HomePage({ onLogout }) {
       alert("Group chat deleted successfully");
     } catch (error) {
       console.error("Unexpected error deleting group chat:", error);
-      alert("An unexpected error occurred");
+      alert("An unexpected error occurred: " + error.message);
     }
   };
 
