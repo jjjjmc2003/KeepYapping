@@ -25,14 +25,33 @@ function ResetPassword() {
         const hash = window.location.hash;
         console.log("Reset password hash:", hash);
 
+        // Log the raw hash content for debugging
+        if (hash) {
+          let hashContent = hash.substring(1);
+          console.log("Raw hash content:", hashContent);
+
+          if (hashContent.includes('#')) {
+            console.log("Contains special prefix, extracting actual parameters");
+            console.log("After prefix removal:", hashContent.split('#')[1]);
+          }
+        }
+
         // If there's a hash, try to extract the access token
-        if (hash && hash.includes('access_token=')) {
+        if (hash && (hash.includes('access_token=') || hash.includes('#access_token='))) {
           // The hash contains the access token and refresh token
           // We need to manually set the session using the hash parameters
           console.log("Found access token in URL, setting session");
 
-          // Extract the hash without the # character
-          const hashParams = hash.substring(1).split('&').reduce((params, param) => {
+          // Extract the hash without the # character and handle special prefix
+          let hashContent = hash.substring(1);
+
+          // Check if there's a special prefix like #for-password-reset#
+          if (hashContent.includes('#')) {
+            // Split at the second # to get the actual parameters
+            hashContent = hashContent.split('#')[1];
+          }
+
+          const hashParams = hashContent.split('&').reduce((params, param) => {
             const [key, value] = param.split('=');
             params[key] = value;
             return params;
@@ -97,9 +116,17 @@ function ResetPassword() {
         // Get the hash from the URL
         const hash = window.location.hash;
 
-        if (hash && hash.includes('access_token=')) {
-          // Extract the hash without the # character
-          const hashParams = hash.substring(1).split('&').reduce((params, param) => {
+        if (hash && (hash.includes('access_token=') || hash.includes('#access_token='))) {
+          // Extract the hash without the # character and handle special prefix
+          let hashContent = hash.substring(1);
+
+          // Check if there's a special prefix like #for-password-reset#
+          if (hashContent.includes('#')) {
+            // Split at the second # to get the actual parameters
+            hashContent = hashContent.split('#')[1];
+          }
+
+          const hashParams = hashContent.split('&').reduce((params, param) => {
             const [key, value] = param.split('=');
             params[key] = decodeURIComponent(value);
             return params;
