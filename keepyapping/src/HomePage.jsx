@@ -566,7 +566,7 @@ function HomePage({ onLogout }) {
           ))}
         </div>
 
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: 5 }}></div>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: 10, marginBottom: 10 }}></div>
 
         <div className="friends-list" style={{ overflowY: "auto", maxHeight: "45%" }}>
           <div className="friends-header">

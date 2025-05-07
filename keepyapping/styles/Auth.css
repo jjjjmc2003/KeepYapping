@@ -133,3 +133,25 @@
   margin-bottom: 8px;
   font-size: 14px;
 }
+
+/* Hide browser's built-in password visibility toggle */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+/* For Chrome/Edge */
+input::-webkit-textfield-decoration-container {
+  visibility: hidden;
+}
+
+/* For Firefox */
+input[type="password"] {
+  -moz-appearance: textfield !important;
+}

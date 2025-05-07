@@ -52,13 +52,15 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: var(--primary-color);
+  background-color: var(--info-color); /* Changed from primary-color to info-color (light blue) */
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
   color: white;
   margin-right: 10px;
+  border: 2px solid var(--background-dark); /* Add a border to make avatars more distinct */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
 }
 
 .user-info {
@@ -146,6 +148,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 10px;
+  margin-bottom: 5px; /* Add some bottom margin */
 }
 
 .friends-header {
@@ -186,9 +189,10 @@
   justify-content: space-between;
   padding: 8px 10px;
   border-radius: var(--border-radius);
-  margin-bottom: 2px;
+  margin-bottom: 5px; /* Increased from 2px to 5px for more spacing */
   cursor: pointer;
   transition: background-color var(--transition-speed);
+  position: relative; /* Added for better positioning control */
 }
 
 .friend-item:hover {
@@ -234,13 +238,15 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: var(--primary-color);
+  background-color: var(--success-color); /* Changed from primary-color to success-color (green) */
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
   color: white;
   margin-right: 10px;
+  border: 2px solid var(--background-dark); /* Add a border to make avatars more distinct */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
 }
 
 .friend-info {
