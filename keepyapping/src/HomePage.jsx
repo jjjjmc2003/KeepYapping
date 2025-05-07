@@ -140,9 +140,14 @@ function HomePage({ onLogout }) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "friend_requests" },
-        (payload) => {
-          fetchFriends();
-          fetchPendingRequests();
+        async (payload) => {
+          console.log("HomePage received real-time update:", payload);
+          // Refresh sidebar data
+          await refreshFriendsList();
+          // Force immediate refresh of FriendSystem data if we're on that page
+          if (activeSection === "friends") {
+            console.log("Triggering FriendSystem refresh from HomePage");
+          }
         }
       )
       .subscribe();
@@ -150,7 +155,7 @@ function HomePage({ onLogout }) {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [userEmail]);
+  }, [userEmail, activeSection]);
 
   // Handle logout
   const handleLogout = async () => {
@@ -175,7 +180,10 @@ function HomePage({ onLogout }) {
           </div>
         );
       case "friends":
-        return <FriendSystem currentUserEmail={userEmail} />;
+        return <FriendSystem 
+          currentUserEmail={userEmail} 
+          onFriendUpdate={refreshFriendsList}
+        />;
       case "chat":
         return <ChatApp userEmail={userEmail} selectedFriend={selectedFriend} />;
       default:
