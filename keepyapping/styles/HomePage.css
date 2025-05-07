@@ -84,6 +84,32 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.3);
 }
 
+.search-container {
+  padding: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 10px;
+  background-color: var(--background-light);
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--text-color);
+  font-size: 14px;
+  transition: background-color var(--transition-speed);
+}
+
+.search-input:focus {
+  outline: none;
+  background-color: var(--background-dark);
+  box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -157,6 +183,7 @@
 .friend-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 8px 10px;
   border-radius: var(--border-radius);
   margin-bottom: 2px;
@@ -170,6 +197,37 @@
 
 .friend-item.active {
   background-color: var(--background-light);
+}
+
+.friend-item-content {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.delete-group-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-speed);
+  visibility: hidden;
+}
+
+.friend-item:hover .delete-group-btn {
+  visibility: visible;
+}
+
+.delete-group-btn:hover {
+  background-color: var(--danger-color);
+  color: white;
 }
 
 .friend-avatar {

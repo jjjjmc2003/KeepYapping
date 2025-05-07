@@ -1,0 +1,180 @@
+.group-chat-creator {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #36393f;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.group-chat-creator-header {
+  background-color: #2f3136;
+  padding: 16px 20px;
+  border-bottom: 1px solid #202225;
+}
+
+.group-chat-creator-header h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.25rem;
+}
+
+.group-chat-creator-content {
+  padding: 20px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #b9bbbe;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 10px;
+  background-color: #40444b;
+  border: none;
+  border-radius: 4px;
+  color: #dcddde;
+  font-size: 1rem;
+}
+
+.input-group input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #5865f2;
+}
+
+.search-input-wrapper {
+  position: relative;
+}
+
+.friends-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #2f3136;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.friend-option {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.friend-option:hover {
+  background-color: #40444b;
+}
+
+.friend-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #5865f2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+.friend-info {
+  color: #dcddde;
+  flex-grow: 1;
+}
+
+.selected-friends {
+  margin-bottom: 20px;
+}
+
+.selected-friends h3 {
+  color: #b9bbbe;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.no-friends-selected {
+  color: #72767d;
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.selected-friends-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.selected-friend {
+  display: flex;
+  align-items: center;
+  background-color: #40444b;
+  border-radius: 16px;
+  padding: 5px 10px;
+}
+
+.remove-friend-btn {
+  background: none;
+  border: none;
+  color: #dcddde;
+  cursor: pointer;
+  margin-left: 5px;
+  font-size: 0.9rem;
+}
+
+.remove-friend-btn:hover {
+  color: #fff;
+}
+
+.create-group-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: #5865f2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-group-btn:hover {
+  background-color: #4752c4;
+}
+
+.create-group-btn:disabled {
+  background-color: #72767d;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background-color: rgba(237, 66, 69, 0.1);
+  color: #ed4245;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.success-message {
+  background-color: rgba(59, 165, 93, 0.1);
+  color: #3ba55d;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}

@@ -7,6 +7,7 @@ import HomePage from "./HomePage";
 import PasswordReset from "./PasswordReset";
 import ResetPasswordWrapper from "./ResetPasswordWrapper";
 import RouteHandler from "./RouteHandler";
+import CreateGroupChat from "./CreateGroupChat";
 
 // Import Supabase
 import * as SupabaseClient from "@supabase/supabase-js";
@@ -106,6 +107,7 @@ function App() {
               <>
                 <Route path="/" element={<HomePage onLogout={() => setUser(null)} />} />
                 <Route path="/chat" element={<ChatApp onLogout={() => setUser(null)} />} />
+                <Route path="/create-group" element={<CreateGroupChat currentUserEmail={user.email} />} />
                 <Route path="*" element={<HomePage onLogout={() => setUser(null)} />} />
               </>
             )}

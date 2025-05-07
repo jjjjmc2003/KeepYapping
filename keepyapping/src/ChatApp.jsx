@@ -1,14 +1,13 @@
 // ChatApp.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { useNavigate } from "react-router-dom";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-export default function ChatApp({ onLogout, userEmail: propUserEmail, selectedFriend, forceGroupChat }) {
+export default function ChatApp({ userEmail: propUserEmail, selectedFriend, selectedGroupChat, forceGroupChat, onDeleteGroupChat }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -16,12 +15,16 @@ export default function ChatApp({ onLogout, userEmail: propUserEmail, selectedFr
   const [selectedUser, setSelectedUser] = useState("");
   const [userDisplayNames, setUserDisplayNames] = useState({});
   const messageEndRef = useRef(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    if (messageEndRef.current) {
-      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    // Use a small timeout to ensure the DOM has updated
+    const scrollTimeout = setTimeout(() => {
+      if (messageEndRef.current) {
+        messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 100);
+
+    return () => clearTimeout(scrollTimeout);
   }, [messages]);
 
   useEffect(() => {
@@ -56,87 +59,240 @@ export default function ChatApp({ onLogout, userEmail: propUserEmail, selectedFr
     } else if (selectedFriend) {
       setChatMode("dm");
       setSelectedUser(selectedFriend);
+    } else if (selectedGroupChat) {
+      setChatMode("groupchat");
+      setSelectedUser("");
+      fetchGroupChatMembers();
     }
-  }, [selectedFriend, forceGroupChat]);
+  }, [selectedFriend, selectedGroupChat, forceGroupChat]);
+
+  const fetchGroupChatMembers = async () => {
+    if (!selectedGroupChat) return;
+
+    try {
+      // We don't need to store the members anymore, just log them
+      if (selectedGroupChat.members) {
+        console.log("Group chat members:", selectedGroupChat.members);
+      } else {
+        // If no members in the object, try to get from localStorage
+        try {
+          const storedGroupChats = localStorage.getItem('groupChats') || '[]';
+          const parsedGroupChats = JSON.parse(storedGroupChats);
+
+          // Find the selected group chat
+          const groupChat = parsedGroupChats.find(chat => chat.id === selectedGroupChat.id);
+
+          if (groupChat && groupChat.members) {
+            console.log("Group chat members from localStorage:", groupChat.members);
+          } else {
+            console.log("No members found for this group chat, defaulting to current user");
+          }
+        } catch (storageError) {
+          console.error("Error reading from localStorage:", storageError);
+        }
+      }
+    } catch (error) {
+      console.error("Unexpected error fetching group chat members:", error);
+    }
+  };
 
   useEffect(() => {
-    if (userEmail) {
-      fetchMessages();
-      const subscription = supabase
-        .channel("messages-channel")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "messages" },
-          (payload) => {
-            const newMsg = payload.new;
-            const involved = [newMsg.sender, newMsg.recipient];
-            if (
-              (chatMode === "group" && newMsg.type === "group") ||
-              (chatMode === "dm" &&
-                involved.includes(userEmail) &&
-                involved.includes(selectedUser))
-            ) {
-              fetchMessages();
-            }
-          }
-        )
-        .subscribe();
+    if (!userEmail) return;
 
-      return () => {
-        supabase.removeChannel(subscription);
-      };
-    }
-  }, [chatMode, selectedUser, userEmail]);
+    // Initial fetch of messages
+    fetchMessages();
+
+    // Set up a timer to periodically refresh messages
+    const refreshInterval = setInterval(() => {
+      console.log("Periodic refresh of messages");
+      fetchMessages();
+    }, 3000); // Refresh every 3 seconds
+
+    // Set up real-time subscription for global chat
+    const globalChatChannel = supabase
+      .channel('global-chat-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: 'type=eq.group'
+        },
+        (payload) => {
+          console.log("Global chat message received:", payload);
+          if (chatMode === "group") {
+            // Force refresh messages
+            fetchMessages();
+          }
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for direct messages to/from this user
+    const dmChannel = supabase
+      .channel(`dm-changes-${userEmail.replace(/[^a-zA-Z0-9]/g, '')}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `type=eq.dm`
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          console.log("DM received:", newMsg);
+
+          // Check if this DM involves the current user
+          if ((newMsg.sender === userEmail || newMsg.recipient === userEmail) &&
+              chatMode === "dm" &&
+              (selectedUser === newMsg.sender || selectedUser === newMsg.recipient)) {
+            console.log("DM is relevant to current chat, refreshing");
+            fetchMessages();
+          }
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for group chat messages
+    const groupChatChannel = supabase
+      .channel(`group-chat-changes-${userEmail.replace(/[^a-zA-Z0-9]/g, '')}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `type=eq.groupchat`
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          console.log("Group chat message received:", newMsg);
+
+          // Check if this group chat message is for the current group chat
+          if (chatMode === "groupchat" &&
+              selectedGroupChat &&
+              newMsg.recipient === `group:${selectedGroupChat.id}`) {
+            console.log("Group chat message is for current chat, refreshing");
+            fetchMessages();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("Cleaning up message subscriptions and interval");
+      clearInterval(refreshInterval);
+      supabase.removeChannel(globalChatChannel);
+      supabase.removeChannel(dmChannel);
+      supabase.removeChannel(groupChatChannel);
+    };
+  }, [chatMode, selectedUser, selectedGroupChat, userEmail]);
 
   async function fetchMessages() {
     if (!userEmail) return;
 
-    let query = supabase.from("messages").select("*");
+    try {
+      let query = supabase.from("messages").select("*");
 
-    if (chatMode === "group") {
-      query = query.eq("type", "group").eq("recipient", "group");
-    } else if (chatMode === "dm" && selectedUser) {
-      query = query
-        .eq("type", "dm")
-        .in("sender", [userEmail, selectedUser])
-        .in("recipient", [userEmail, selectedUser]);
-    } else {
+      if (chatMode === "group") {
+        // Global chat
+        query = query.eq("type", "group").eq("recipient", "group");
+      } else if (chatMode === "dm" && selectedUser) {
+        // Direct messages
+        query = query
+          .eq("type", "dm")
+          .in("sender", [userEmail, selectedUser])
+          .in("recipient", [userEmail, selectedUser]);
+      } else if (chatMode === "groupchat" && selectedGroupChat) {
+        // Group chat - use a special recipient format
+        query = query
+          .eq("type", "groupchat")
+          .eq("recipient", `group:${selectedGroupChat.id}`);
+      } else {
+        setMessages([]);
+        return;
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: true });
+      if (error) {
+        console.error("Error fetching messages:", error);
+        setMessages([]);
+      } else {
+        setMessages(data || []);
+      }
+    } catch (error) {
+      console.error("Unexpected error in fetchMessages:", error);
       setMessages([]);
-      return;
-    }
-
-    const { data, error } = await query.order("created_at", { ascending: true });
-    if (error) {
-      console.error("Error fetching messages:", error);
-    } else {
-      setMessages(data || []);
     }
   }
 
   async function sendMessage() {
     if (!newMessage.trim()) return;
 
-    const messageData = {
-      text: newMessage,
-      sender: userEmail,
-      type: chatMode,
-      recipient: chatMode === "group" ? "group" : selectedUser,
-    };
+    try {
+      // Create message data
+      const messageData = {
+        text: newMessage,
+        sender: userEmail,
+        type: chatMode,
+        recipient: chatMode === "group" ? "group" : selectedUser,
+        created_at: new Date().toISOString()
+      };
 
-    setNewMessage("");
-    const { error } = await supabase.from("messages").insert([messageData]);
+      // For group chats, use a special recipient format
+      if (chatMode === "groupchat" && selectedGroupChat) {
+        messageData.recipient = `group:${selectedGroupChat.id}`;
+      }
 
-    if (error) {
-      console.error("Error sending message:", error);
-    } else {
-      fetchMessages();
+      // Clear the input immediately for better UX
+      const messageText = newMessage;
+      setNewMessage("");
+
+      // Optimistically add the message to the UI
+      const optimisticMessage = {
+        ...messageData,
+        id: `temp-${Date.now()}`, // Temporary ID
+        text: messageText
+      };
+
+      // Add to messages state immediately
+      setMessages(prevMessages => [...prevMessages, optimisticMessage]);
+
+      // Insert the message in the database
+      const { error } = await supabase
+        .from("messages")
+        .insert([{...messageData, text: messageText}]);
+
+      if (error) {
+        console.error("Error sending message:", error);
+        // Remove the optimistic message on error
+        setMessages(prevMessages =>
+          prevMessages.filter(msg => msg.id !== optimisticMessage.id)
+        );
+        return;
+      }
+
+      // The real-time subscription will handle updating the message list
+      // No need to call fetchMessages() here
+    } catch (error) {
+      console.error("Unexpected error in sendMessage:", error);
     }
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    if (onLogout) onLogout();
-    navigate("/login");
+
+
+  // Get chat title based on chat mode
+  const getChatTitle = () => {
+    if (chatMode === "group") {
+      return "Global Yappers Chat";
+    } else if (chatMode === "dm") {
+      return `Chat with ${userDisplayNames[selectedUser] || selectedUser}`;
+    } else if (chatMode === "groupchat" && selectedGroupChat) {
+      return selectedGroupChat.name;
+    }
+    return "Chat";
   };
 
   return (
@@ -150,11 +306,25 @@ export default function ChatApp({ onLogout, userEmail: propUserEmail, selectedFr
         gap: "20px",
       }}
     >
-      <h3>
-        {chatMode === "group"
-          ? "Global Yappers Chat"
-          : `Chat with ${userDisplayNames[selectedUser] || selectedUser}`}
-      </h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3>{getChatTitle()}</h3>
+        {chatMode === "groupchat" && selectedGroupChat && onDeleteGroupChat && (
+          <button
+            onClick={() => onDeleteGroupChat(selectedGroupChat.id)}
+            style={{
+              backgroundColor: "#f04747",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              padding: "5px 10px",
+              cursor: "pointer",
+              fontSize: "0.9rem",
+            }}
+          >
+            Delete Group Chat
+          </button>
+        )}
+      </div>
 
       <div
         style={{
