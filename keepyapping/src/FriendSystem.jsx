@@ -8,10 +8,10 @@ const SUPABASE_ANON_KEY =
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function FriendSystem({ currentUserEmail }) {
-  const [searchEmail, setSearchEmail] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [user, setUser] = useState(null);
   const [searchError, setSearchError] = useState("");
-  const [emailSuggestions, setEmailSuggestions] = useState([]);
+  const [userSuggestions, setUserSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [requests, setRequests] = useState([]);
@@ -46,24 +46,24 @@ function FriendSystem({ currentUserEmail }) {
     };
   }, []);
 
-  // --- Fetch Email Suggestions ---
-  const fetchEmailSuggestions = async (query) => {
+  // --- Fetch User Suggestions ---
+  const fetchUserSuggestions = async (query) => {
     if (!query || query.length < 1) {
-      setEmailSuggestions([]);
+      setUserSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
     try {
-      // Fetch users whose email contains the query string
+      // Fetch users whose display name contains the query string
       const { data, error } = await supabase
         .from("users")
-        .select("email")
-        .ilike("email", `%${query}%`)
+        .select("email, displayname, name")
+        .ilike("displayname", `%${query}%`)
         .limit(10); // Fetch more initially, we'll filter some out
 
       if (error) {
-        console.error("Error fetching email suggestions:", error);
+        console.error("Error fetching user suggestions:", error);
         return;
       }
 
@@ -78,49 +78,53 @@ function FriendSystem({ currentUserEmail }) {
       // 2. Existing friends
       // 3. Users with pending requests
       const filteredSuggestions = data
-        .map(user => user.email)
-        .filter(email =>
-          email !== currentUserEmail &&
-          !friends.includes(email) &&
-          !pendingEmails.includes(email)
+        .filter(user =>
+          user.email !== currentUserEmail &&
+          !friends.includes(user.email) &&
+          !pendingEmails.includes(user.email) &&
+          user.displayname // Only include users with a display name
         );
 
-      setEmailSuggestions(filteredSuggestions.slice(0, 5)); // Limit to 5 after filtering
+      setUserSuggestions(filteredSuggestions.slice(0, 5)); // Limit to 5 after filtering
       setShowSuggestions(filteredSuggestions.length > 0);
     } catch (error) {
-      console.error("Unexpected error fetching email suggestions:", error);
+      console.error("Unexpected error fetching user suggestions:", error);
     }
   };
 
   // --- Handle Search Input Change ---
   const handleSearchInputChange = (e) => {
     const value = e.target.value;
-    setSearchEmail(value);
-    fetchEmailSuggestions(value);
+    setSearchTerm(value);
+    fetchUserSuggestions(value);
   };
 
   // --- Select Suggestion ---
-  const selectSuggestion = (email) => {
-    setSearchEmail(email);
+  const selectSuggestion = (user) => {
+    setSearchTerm(user.displayname);
     setShowSuggestions(false);
     // Automatically search for the selected user
-    searchUserByEmail(email);
+    searchUserByDisplayName(user.displayname);
   };
 
   // --- Search User ---
   const searchUser = () => {
-    searchUserByEmail(searchEmail);
+    if (searchTerm) {
+      searchUserByDisplayName(searchTerm);
+    } else {
+      setSearchError("Please enter a display name to search");
+    }
   };
 
-  // --- Search User By Email ---
-  const searchUserByEmail = async (email) => {
+  // --- Search User By Display Name ---
+  const searchUserByDisplayName = async (displayName) => {
     setSearchError("");
     setUser(null);
 
     const { data, error } = await supabase
       .from("users")
       .select("email, name, displayname")
-      .eq("email", email)
+      .eq("displayname", displayName)
       .single();
 
     if (error) {
@@ -200,7 +204,7 @@ function FriendSystem({ currentUserEmail }) {
 
     alert("Friend request sent!");
     setUser(null); // clear search result
-    setSearchEmail(""); // clear input
+    setSearchTerm(""); // clear input
 
     // Refresh outgoing requests
     fetchOutgoingRequests();
@@ -606,26 +610,27 @@ function FriendSystem({ currentUserEmail }) {
           <div className="search-container">
             <div className="search-input-wrapper">
               <input
-                type="email"
+                type="text"
                 className="search-input"
-                placeholder="Enter a user's email"
-                value={searchEmail}
+                placeholder="Enter a user's display name"
+                value={searchTerm}
                 onChange={handleSearchInputChange}
-                onFocus={() => searchEmail.length > 0 && setShowSuggestions(true)}
+                onFocus={() => searchTerm.length > 0 && setShowSuggestions(true)}
                 onBlur={() => {
                   // Delay hiding suggestions to allow clicking on them
                   setTimeout(() => setShowSuggestions(false), 200);
                 }}
               />
-              {showSuggestions && emailSuggestions.length > 0 && (
+              {showSuggestions && userSuggestions.length > 0 && (
                 <div className="email-suggestions">
-                  {emailSuggestions.map((email, index) => (
+                  {userSuggestions.map((user, index) => (
                     <div
                       key={index}
                       className="suggestion-item"
-                      onClick={() => selectSuggestion(email)}
+                      onClick={() => selectSuggestion(user)}
                     >
-                      {email}
+                      <span className="suggestion-display-name">{user.displayname}</span>
+                      <span className="suggestion-email">({user.email})</span>
                     </div>
                   ))}
                 </div>
