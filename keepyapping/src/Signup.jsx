@@ -144,8 +144,6 @@ function Signup() {
         </div>
 
         <form className="auth-form" onSubmit={handleSignup}>
-          {error && <div style={{ color: "red", marginBottom: "10px" }}>{error}</div>}
-          {message && <div style={{ color: "lightgreen", marginBottom: "10px" }}>{message}</div>}
 
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <label htmlFor="name" style={{ color: "#ccc" }}>Full Name</label>
@@ -258,10 +256,39 @@ function Signup() {
               fontSize: "1rem",
               width: "100%",
               cursor: "pointer",
+              marginBottom: "0.75rem"
             }}
           >
             Sign Up
           </button>
+
+          {error && (
+            <div style={{
+              color: "white",
+              backgroundColor: "#f04747",
+              padding: "0.75rem",
+              borderRadius: "8px",
+              marginTop: "0.5rem",
+              fontSize: "0.9rem",
+              textAlign: "center"
+            }}>
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div style={{
+              color: "white",
+              backgroundColor: "#43b581",
+              padding: "0.75rem",
+              borderRadius: "8px",
+              marginTop: "0.5rem",
+              fontSize: "0.9rem",
+              textAlign: "center"
+            }}>
+              {message}
+            </div>
+          )}
         </form>
 
         <div className="auth-footer" style={{ textAlign: "center", marginTop: "1rem" }}>
