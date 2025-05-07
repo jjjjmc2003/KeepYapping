@@ -180,10 +180,22 @@ function FriendSystem({ currentUserEmail }) {
         return;
       }
 
-      // If there's a rejected request
+      // If there's a rejected request, delete it and allow sending a new one
+      // This allows users to send another friend request after rejection
       if (request.status === "rejected") {
-        setSearchError("A previous friend request was rejected. Please try again later.");
-        return;
+        console.log("Found a rejected request, deleting it to allow a new one");
+
+        // Delete the old rejected request to make way for a new one
+        const { error: deleteError } = await supabase
+          .from("friend_requests")
+          .delete()
+          .eq("id", request.id);
+
+        if (deleteError) {
+          console.error("Error deleting old rejected request:", deleteError);
+          setSearchError("Failed to process friend request. Please try again.");
+          return;
+        }
       }
     }
 
@@ -276,9 +288,14 @@ function FriendSystem({ currentUserEmail }) {
     try {
       console.log(`Responding to friend request ${requestId} with status: ${status}`);
 
+      // Just update the status
+      // When status is "rejected", the sender will be able to send another request later
+      // This is handled in the sendFriendRequest function which deletes rejected requests
+      const updateData = { status };
+
       const { error } = await supabase
         .from("friend_requests")
-        .update({ status })
+        .update(updateData)
         .eq("id", requestId);
 
       if (error) {
