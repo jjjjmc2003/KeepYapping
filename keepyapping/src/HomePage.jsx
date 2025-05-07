@@ -6,6 +6,7 @@ import ChatApp from "./ChatApp";
 import FriendSystem from "./FriendSystem";
 import ProfileEditor from "./ProfileEditor";
 import GroupChatCreator from "./GroupChatCreator";
+import avatars from "./avatars";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
@@ -15,8 +16,10 @@ function HomePage({ onLogout }) {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
+  const [userAvatarId, setUserAvatarId] = useState(1); // Default avatar ID
   const [friends, setFriends] = useState([]);
   const [friendDisplayNames, setFriendDisplayNames] = useState({});
+  const [friendAvatarIds, setFriendAvatarIds] = useState({});
   const [pendingRequests, setPendingRequests] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
   const [activeSection, setActiveSection] = useState("home");
@@ -43,6 +46,7 @@ function HomePage({ onLogout }) {
 
       if (userData) {
         setUserName(userData.displayname || userData.name || userData.email);
+        setUserAvatarId(userData.avatar_id || 1); // Default to 1 if not set
       }
     }
 
@@ -167,14 +171,17 @@ function HomePage({ onLogout }) {
 
     const { data: users } = await supabase
       .from("users")
-      .select("email, displayname")
+      .select("email, displayname, avatar_id")
       .in("email", emails);
 
     const nameMap = {};
+    const avatarMap = {};
     users?.forEach(u => {
       nameMap[u.email] = u.displayname || u.email;
+      avatarMap[u.email] = u.avatar_id || 1; // Default to 1 if not set
     });
     setFriendDisplayNames(nameMap);
+    setFriendAvatarIds(avatarMap);
 
     // Apply search filter if there's an active search
     if (searchTerm) {
@@ -312,6 +319,11 @@ function HomePage({ onLogout }) {
   const handleProfileUpdate = (profileData) => {
     // Update the user name in the UI
     setUserName(profileData.displayname || profileData.name || userEmail);
+
+    // Update avatar ID if provided
+    if (profileData.avatar_id) {
+      setUserAvatarId(profileData.avatar_id);
+    }
 
     // Refresh friends list to update any display name changes
     refreshFriendsList();
@@ -495,7 +507,16 @@ function HomePage({ onLogout }) {
     <div className="home-container">
       <div className="sidebar">
         <div className="user-profile">
-          <div className="user-avatar">{userName.charAt(0).toUpperCase()}</div>
+          <div className="user-avatar">
+            {userAvatarId ? (
+              <img
+                src={avatars.find(a => a.id === userAvatarId)?.url || avatars[0].url}
+                alt={userName}
+              />
+            ) : (
+              userName.charAt(0).toUpperCase()
+            )}
+          </div>
           <div className="user-info">
             <div className="user-name">{userName}</div>
             <div className="user-status">User</div>
@@ -557,7 +578,16 @@ function HomePage({ onLogout }) {
               setSelectedGroupChat(null);
               setActiveSection("chat");
             }}>
-              <div className="friend-avatar">{friend.charAt(0).toUpperCase()}</div>
+              <div className="friend-avatar">
+                {friendAvatarIds[friend] ? (
+                  <img
+                    src={avatars.find(a => a.id === friendAvatarIds[friend])?.url || avatars[0].url}
+                    alt={friendDisplayNames[friend] || friend}
+                  />
+                ) : (
+                  (friendDisplayNames[friend] || friend).charAt(0).toUpperCase()
+                )}
+              </div>
               <div className="friend-info">
                 <div className="friend-name">{friendDisplayNames[friend] || friend}</div>
                 <div className="friend-status">Online</div>
@@ -583,7 +613,9 @@ function HomePage({ onLogout }) {
                   setActiveSection("chat");
                 }}
               >
-                <div className="friend-avatar">{chat.name.charAt(0).toUpperCase()}</div>
+                <div className="friend-avatar">
+                  {chat.name.charAt(0).toUpperCase()}
+                </div>
                 <div className="friend-info">
                   <div className="friend-name">{chat.name}</div>
                   <div className="friend-status">Group</div>

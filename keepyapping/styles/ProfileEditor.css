@@ -121,3 +121,53 @@
 .bio-text {
   white-space: pre-wrap;
 }
+
+.avatar-selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+}
+
+.avatar-option {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.avatar-option:hover {
+  transform: scale(1.05);
+}
+
+.avatar-option.selected {
+  border-color: var(--primary-color);
+}
+
+.avatar-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.current-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid var(--primary-color);
+}
+
+.current-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

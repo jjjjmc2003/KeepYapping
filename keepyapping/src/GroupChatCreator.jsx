@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/GroupChatCreator.css";
+import avatars from "./avatars";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
@@ -111,10 +112,10 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
       );
 
-      // Fetch display names for all friends
+      // Fetch display names and avatar IDs for all friends
       const { data: usersData, error: usersError } = await supabase
         .from("users")
-        .select("email, displayname")
+        .select("email, displayname, avatar_id")
         .in("email", friendEmails);
 
       if (usersError) {
@@ -123,12 +124,13 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         return;
       }
 
-      // Create enhanced friend objects with both email and display name
+      // Create enhanced friend objects with email, display name, and avatar ID
       const enhancedFriends = friendEmails.map(email => {
         const user = usersData.find(u => u.email === email);
         return {
           email: email,
-          displayName: user?.displayname || email
+          displayName: user?.displayname || email,
+          avatarId: user?.avatar_id || 1 // Default to 1 if not set
         };
       });
 
@@ -360,7 +362,14 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
                     }}
                   >
                     <div className="friend-avatar">
-                      {(friend.displayName || friend.email).charAt(0).toUpperCase()}
+                      {friend.avatarId ? (
+                        <img
+                          src={avatars.find(a => a.id === friend.avatarId)?.url || avatars[0].url}
+                          alt={friend.displayName || friend.email}
+                        />
+                      ) : (
+                        (friend.displayName || friend.email).charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div className="friend-info">
                       {friend.displayName || friend.email}
@@ -381,7 +390,14 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
               {selectedFriends.map((friend) => (
                 <div key={friend.email} className="selected-friend">
                   <div className="friend-avatar">
-                    {(friend.displayName || friend.email).charAt(0).toUpperCase()}
+                    {friend.avatarId ? (
+                      <img
+                        src={avatars.find(a => a.id === friend.avatarId)?.url || avatars[0].url}
+                        alt={friend.displayName || friend.email}
+                      />
+                    ) : (
+                      (friend.displayName || friend.email).charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div className="friend-info">
                     {friend.displayName || friend.email}

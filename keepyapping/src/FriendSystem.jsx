@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/FriendSystem.css";
+import avatars from "./avatars";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -58,7 +59,7 @@ function FriendSystem({ currentUserEmail }) {
       // Fetch users whose display name contains the query string
       const { data, error } = await supabase
         .from("users")
-        .select("email, displayname, name")
+        .select("email, displayname, name, avatar_id")
         .ilike("displayname", `%${query}%`)
         .limit(10); // Fetch more initially, we'll filter some out
 
@@ -123,7 +124,7 @@ function FriendSystem({ currentUserEmail }) {
 
     const { data, error } = await supabase
       .from("users")
-      .select("email, name, displayname")
+      .select("email, name, displayname, avatar_id")
       .eq("displayname", displayName)
       .single();
 
@@ -277,7 +278,7 @@ function FriendSystem({ currentUserEmail }) {
       const senderEmails = requestsData.map(req => req.sender_email);
       const { data: usersData, error: usersError } = await supabase
         .from("users")
-        .select("email, displayname")
+        .select("email, displayname, avatar_id")
         .in("email", senderEmails);
 
       if (usersError) {
@@ -286,16 +287,19 @@ function FriendSystem({ currentUserEmail }) {
         return;
       }
 
-      // Create a map of email to display name
+      // Create maps for display name and avatar ID
       const displayNameMap = {};
+      const avatarIdMap = {};
       usersData.forEach(user => {
         displayNameMap[user.email] = user.displayname || user.email;
+        avatarIdMap[user.email] = user.avatar_id || 1; // Default to 1 if not set
       });
 
-      // Enhance the request data with display names
+      // Enhance the request data with display names and avatar IDs
       const enhancedRequests = requestsData.map(req => ({
         ...req,
-        sender_display_name: displayNameMap[req.sender_email] || req.sender_email
+        sender_display_name: displayNameMap[req.sender_email] || req.sender_email,
+        sender_avatar_id: avatarIdMap[req.sender_email] || 1
       }));
 
       setRequests(enhancedRequests);
@@ -472,10 +476,10 @@ function FriendSystem({ currentUserEmail }) {
           req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
         );
 
-        // Fetch display names for all friends
+        // Fetch display names and avatar IDs for all friends
         const { data: usersData, error: usersError } = await supabase
           .from("users")
-          .select("email, displayname")
+          .select("email, displayname, avatar_id")
           .in("email", friendEmails);
 
         if (usersError) {
@@ -486,16 +490,19 @@ function FriendSystem({ currentUserEmail }) {
           return;
         }
 
-        // Create a map of email to display name
+        // Create maps for display name and avatar ID
         const displayNameMap = {};
+        const avatarIdMap = {};
         usersData.forEach(user => {
           displayNameMap[user.email] = user.displayname || user.email;
+          avatarIdMap[user.email] = user.avatar_id || 1; // Default to 1 if not set
         });
 
-        // Create enhanced friend objects with both email and display name
+        // Create enhanced friend objects with email, display name, and avatar ID
         const enhancedFriends = friendEmails.map(email => ({
           email: email,
-          displayName: displayNameMap[email] || email
+          displayName: displayNameMap[email] || email,
+          avatarId: avatarIdMap[email] || 1
         }));
 
         console.log("Processed friend list with display names:", enhancedFriends);
@@ -663,7 +670,7 @@ function FriendSystem({ currentUserEmail }) {
       const receiverEmails = requestsData.map(req => req.receiver_email);
       const { data: usersData, error: usersError } = await supabase
         .from("users")
-        .select("email, displayname")
+        .select("email, displayname, avatar_id")
         .in("email", receiverEmails);
 
       if (usersError) {
@@ -672,16 +679,19 @@ function FriendSystem({ currentUserEmail }) {
         return;
       }
 
-      // Create a map of email to display name
+      // Create maps for display name and avatar ID
       const displayNameMap = {};
+      const avatarIdMap = {};
       usersData.forEach(user => {
         displayNameMap[user.email] = user.displayname || user.email;
+        avatarIdMap[user.email] = user.avatar_id || 1; // Default to 1 if not set
       });
 
-      // Enhance the request data with display names
+      // Enhance the request data with display names and avatar IDs
       const enhancedRequests = requestsData.map(req => ({
         ...req,
-        receiver_display_name: displayNameMap[req.receiver_email] || req.receiver_email
+        receiver_display_name: displayNameMap[req.receiver_email] || req.receiver_email,
+        receiver_avatar_id: avatarIdMap[req.receiver_email] || 1
       }));
 
       setOutgoingRequests(enhancedRequests);
@@ -791,7 +801,14 @@ function FriendSystem({ currentUserEmail }) {
           {user && (
             <div className="friend-item">
               <div className="friend-avatar">
-                {user.displayname ? user.displayname.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+                {user.avatar_id ? (
+                  <img
+                    src={avatars.find(a => a.id === user.avatar_id)?.url || avatars[0].url}
+                    alt={user.displayname || user.email}
+                  />
+                ) : (
+                  user.displayname ? user.displayname.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()
+                )}
               </div>
               <div className="friend-info">
                 <div className="friend-name">
@@ -852,7 +869,14 @@ function FriendSystem({ currentUserEmail }) {
           {requests.map((req) => (
             <div key={req.id} className="friend-item">
               <div className="friend-avatar">
-                {(req.sender_display_name || req.sender_email).charAt(0).toUpperCase()}
+                {req.sender_avatar_id ? (
+                  <img
+                    src={avatars.find(a => a.id === req.sender_avatar_id)?.url || avatars[0].url}
+                    alt={req.sender_display_name || req.sender_email}
+                  />
+                ) : (
+                  (req.sender_display_name || req.sender_email).charAt(0).toUpperCase()
+                )}
               </div>
               <div className="friend-info">
                 <div className="friend-name">
@@ -904,7 +928,14 @@ function FriendSystem({ currentUserEmail }) {
           {outgoingRequests.map((req) => (
             <div key={req.id} className="friend-item">
               <div className="friend-avatar">
-                {(req.receiver_display_name || req.receiver_email).charAt(0).toUpperCase()}
+                {req.receiver_avatar_id ? (
+                  <img
+                    src={avatars.find(a => a.id === req.receiver_avatar_id)?.url || avatars[0].url}
+                    alt={req.receiver_display_name || req.receiver_email}
+                  />
+                ) : (
+                  (req.receiver_display_name || req.receiver_email).charAt(0).toUpperCase()
+                )}
               </div>
               <div className="friend-info">
                 <div className="friend-name">
@@ -942,9 +973,16 @@ function FriendSystem({ currentUserEmail }) {
           {friends.map((friend) => (
             <div key={typeof friend === 'object' ? friend.email : friend} className="friend-item">
               <div className="friend-avatar">
-                {typeof friend === 'object'
-                  ? (friend.displayName || friend.email).charAt(0).toUpperCase()
-                  : friend.charAt(0).toUpperCase()}
+                {typeof friend === 'object' && friend.avatarId ? (
+                  <img
+                    src={avatars.find(a => a.id === friend.avatarId)?.url || avatars[0].url}
+                    alt={friend.displayName || friend.email}
+                  />
+                ) : (
+                  typeof friend === 'object'
+                    ? (friend.displayName || friend.email).charAt(0).toUpperCase()
+                    : friend.charAt(0).toUpperCase()
+                )}
               </div>
               <div className="friend-info">
                 <div className="friend-name">

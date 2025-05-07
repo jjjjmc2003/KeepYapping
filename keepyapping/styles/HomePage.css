@@ -61,6 +61,13 @@
   margin-right: 10px;
   border: 2px solid var(--background-dark); /* Add a border to make avatars more distinct */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
+  overflow: hidden; /* Ensure image stays within the circle */
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Ensure the image covers the entire container */
 }
 
 .user-info {
@@ -247,6 +254,13 @@
   margin-right: 10px;
   border: 2px solid var(--background-dark); /* Add a border to make avatars more distinct */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
+  overflow: hidden; /* Ensure image stays within the circle */
+}
+
+.friend-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Ensure the image covers the entire container */
 }
 
 .friend-info {

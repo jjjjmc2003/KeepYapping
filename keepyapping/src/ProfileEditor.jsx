@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/ProfileEditor.css";
+import avatars from "./avatars";
 
 // Supabase Setup
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
@@ -12,6 +13,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [avatarId, setAvatarId] = useState(1); // Default avatar ID
   const [originalDisplayName, setOriginalDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
@@ -39,6 +41,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           setDisplayName(data.displayname || "");
           setOriginalDisplayName(data.displayname || "");
           setBio(data.bio || "");
+          setAvatarId(data.avatar_id || 1); // Default to 1 if not set
         }
       } catch (err) {
         console.error("Unexpected error fetching user profile:", err);
@@ -119,7 +122,8 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         email: userEmail,
         name,
         displayname: displayName,
-        bio
+        bio,
+        avatar_id: avatarId
       };
 
       let updateResult;
@@ -137,7 +141,8 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           .update({
             name,
             displayname: displayName,
-            bio
+            bio,
+            avatar_id: avatarId
           })
           .eq("email", userEmail);
       }
@@ -205,7 +210,8 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         onProfileUpdate({
           name,
           displayname: displayName,
-          bio
+          bio,
+          avatar_id: avatarId
         });
       }
     } catch (err) {
@@ -276,6 +282,21 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             />
           </div>
 
+          <div className="form-group">
+            <label>Avatar</label>
+            <div className="avatar-selection">
+              {avatars.map((avatar) => (
+                <div
+                  key={avatar.id}
+                  className={`avatar-option ${avatarId === avatar.id ? 'selected' : ''}`}
+                  onClick={() => setAvatarId(avatar.id)}
+                >
+                  <img src={avatar.url} alt={avatar.name} />
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="form-actions">
             <button
               type="button"
@@ -302,6 +323,17 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         </form>
       ) : (
         <div className="profile-display">
+          <div className="profile-field">
+            <div className="field-label">Avatar:</div>
+            <div className="field-value">
+              <div className="current-avatar">
+                <img
+                  src={avatars.find(a => a.id === avatarId)?.url || avatars[0].url}
+                  alt="Your avatar"
+                />
+              </div>
+            </div>
+          </div>
           <div className="profile-field">
             <div className="field-label">Email:</div>
             <div className="field-value">{userEmail}</div>
