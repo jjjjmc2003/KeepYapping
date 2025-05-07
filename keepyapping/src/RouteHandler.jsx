@@ -1,11 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
-import * as SupabaseClient from "@supabase/supabase-js";
-
-const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
-const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /**
  * This component handles special routes that need to override the normal authentication flow
@@ -47,9 +41,11 @@ function RouteHandler({ children }) {
         );
 
           if (hasToken || hasParams) {
-            console.log('RouteHandler - Found reset token or params, signing out user');
-            // Force sign out any existing user
-            await supabase.auth.signOut();
+            console.log('RouteHandler - Found reset token or params');
+
+            // We don't want to sign out the user here anymore
+            // We need to keep the token in the URL for the ResetPassword component to use
+
             // Let the normal routing continue
             setShouldRedirect(false);
           } else {

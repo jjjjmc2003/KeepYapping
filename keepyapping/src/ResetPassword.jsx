@@ -17,8 +17,53 @@ function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // The ResetPasswordWrapper component has already verified the token
-  // and signed out any existing user, so we can assume we're in a valid recovery flow
+  // Check if we have a valid hash in the URL
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // Get the hash from the URL
+        const hash = window.location.hash;
+        console.log("Reset password hash:", hash);
+
+        // If there's a hash, try to extract the access token
+        if (hash && hash.includes('access_token=')) {
+          // The hash contains the access token and refresh token
+          // We need to manually set the session using the hash parameters
+          console.log("Found access token in URL, setting session");
+
+          // Extract the hash without the # character
+          const hashParams = hash.substring(1).split('&').reduce((params, param) => {
+            const [key, value] = param.split('=');
+            params[key] = value;
+            return params;
+          }, {});
+
+          console.log("Hash parameters:", hashParams);
+
+          if (hashParams.access_token) {
+            // Set the session manually
+            const { error } = await supabase.auth.setSession({
+              access_token: hashParams.access_token,
+              refresh_token: hashParams.refresh_token || ''
+            });
+
+            if (error) {
+              console.error("Error setting session:", error);
+              setError("Error setting up password reset session. Please request a new reset link.");
+            } else {
+              console.log("Session set successfully");
+            }
+          }
+        } else {
+          console.log("No access token found in URL");
+        }
+      } catch (err) {
+        console.error("Error checking session:", err);
+      }
+    };
+
+    checkSession();
+  }, []);
 
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
@@ -44,6 +89,50 @@ function ResetPassword() {
       // Get the current session to check if we're in a recovery flow
       const { data: sessionData } = await supabase.auth.getSession();
       console.log("Current session:", sessionData);
+
+      // Check if we have a valid session
+      if (!sessionData.session) {
+        console.log("No session found, trying to extract token from URL");
+
+        // Get the hash from the URL
+        const hash = window.location.hash;
+
+        if (hash && hash.includes('access_token=')) {
+          // Extract the hash without the # character
+          const hashParams = hash.substring(1).split('&').reduce((params, param) => {
+            const [key, value] = param.split('=');
+            params[key] = decodeURIComponent(value);
+            return params;
+          }, {});
+
+          console.log("Hash parameters:", hashParams);
+
+          if (hashParams.access_token) {
+            // Set the session manually
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: hashParams.access_token,
+              refresh_token: hashParams.refresh_token || ''
+            });
+
+            if (sessionError) {
+              console.error("Error setting session:", sessionError);
+              setError("Error setting up password reset session. Please request a new reset link.");
+              setLoading(false);
+              return;
+            }
+
+            console.log("Session set successfully");
+          } else {
+            setError("Invalid reset link. Please request a new one.");
+            setLoading(false);
+            return;
+          }
+        } else {
+          setError("Invalid reset link. Please request a new one.");
+          setLoading(false);
+          return;
+        }
+      }
 
       // Update the user's password
       const { error: updateError } = await supabase.auth.updateUser({
