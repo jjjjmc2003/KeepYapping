@@ -1,0 +1,123 @@
+.profile-editor {
+  background-color: var(--background-light);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+  box-shadow: var(--box-shadow);
+}
+
+.profile-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.profile-editor-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.edit-profile-btn {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.message {
+  padding: 10px;
+  border-radius: var(--border-radius);
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.message.success {
+  background-color: rgba(67, 181, 129, 0.2);
+  border: 1px solid var(--success-color);
+  color: var(--success-color);
+}
+
+.message.error {
+  background-color: rgba(240, 71, 71, 0.2);
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  background-color: var(--background-dark);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  color: var(--text-color);
+  font-size: 14px;
+  transition: border-color var(--transition-speed);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-secondary {
+  background-color: var(--background-dark);
+  color: var(--text-color);
+}
+
+.btn-secondary:hover {
+  background-color: #2a2d31;
+}
+
+.profile-display {
+  background-color: var(--background-dark);
+  border-radius: var(--border-radius);
+  padding: 15px;
+}
+
+.profile-field {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+.field-label {
+  width: 120px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.field-value {
+  flex: 1;
+  font-size: 14px;
+}
+
+.bio-text {
+  white-space: pre-wrap;
+}

@@ -233,9 +233,16 @@
   padding: 20px;
 }
 
+.home-content {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
 .welcome-message {
   text-align: center;
-  margin-top: 100px;
+  margin-top: 50px;
+  margin-bottom: 20px;
 }
 
 .welcome-message h1 {

@@ -1,5 +1,5 @@
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/Auth.css";
 import backgroundImage from "./Images/KeepYappingLogo.png";
@@ -9,68 +9,45 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function Login({ onLogin }) {
+function PasswordReset() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [loading, setLoading] = useState(false);
 
-  // Check if user arrived here after email verification
-  useEffect(() => {
-    const hash = location.hash;
-    if (hash && hash.includes('verified')) {
-      setMessage("Email verified successfully! You can now log in.");
-    }
-  }, [location]);
-
-  const handleLogin = async (e) => {
+  const handlePasswordReset = async (e) => {
     e.preventDefault();
     setError("");
+    setMessage("");
+    setLoading(true);
+
+    if (!email) {
+      setError("Email is required");
+      setLoading(false);
+      return;
+    }
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      console.log("Sending password reset email to:", email);
+
+      // Use Supabase's password reset functionality with exact URL
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `https://keep-yapping.netlify.app/reset-password#for-password-reset`,
       });
 
-      if (signInError) {
-        setError("Login failed. Please check your credentials and/or verify your account.");
-        return;
+      console.log("Password reset email sent, error:", resetError);
+
+      if (resetError) {
+        setError(`Error: ${resetError.message}`);
+      } else {
+        setMessage(
+          "Password reset instructions have been sent to your email. Please check your inbox."
+        );
       }
-
-      const { user } = data;
-
-      const { data: existingUser, error: selectError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single();
-
-      if (selectError && selectError.code !== "PGRST116") {
-        console.error("Error checking user table:", selectError);
-        setError("An error occurred while checking your profile.");
-        return;
-      }
-
-      if (!existingUser) {
-        await supabase.from("users").insert([
-          {
-            email: user.email,
-            name: "",
-            bio: "",
-            displayname: "",
-          },
-        ]);
-      }
-
-      setError("");
-      // The onAuthStateChange listener in App.jsx will handle setting the user
-      if (onLogin) onLogin(user);
-      navigate("/");
-    } catch (error) {
-      setError(`Unexpected error: ${error.message}`);
+    } catch (err) {
+      setError(`Unexpected error: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,11 +67,10 @@ function Login({ onLogin }) {
         backgroundPosition: "center",
       }}
     >
-      {/* Login Card */}
       <div
         className="auth-card"
         style={{
-         backgroundColor: "rgba(20, 20, 20, 0.92)",
+          backgroundColor: "rgba(20, 20, 20, 0.92)",
           borderRadius: "12px",
           padding: "1.5rem",
           boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
@@ -107,11 +83,13 @@ function Login({ onLogin }) {
         }}
       >
         <div className="auth-header" style={{ textAlign: "center", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#fff" }}>Welcome to KeepYapping</h2>
-          <p style={{ color: "#ccc", fontSize: "0.95rem" }}>Log in to your account</p>
+          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#fff" }}>Reset Password</h2>
+          <p style={{ color: "#ccc", fontSize: "0.95rem" }}>
+            Enter your email to receive reset instructions
+          </p>
         </div>
 
-        <form className="auth-form" onSubmit={handleLogin}>
+        <form className="auth-form" onSubmit={handlePasswordReset}>
           {error && (
             <div
               className="error-message"
@@ -168,62 +146,34 @@ function Login({ onLogin }) {
             />
           </div>
 
-          <div className="form-group" style={{ marginBottom: "1rem" }}>
-            <label htmlFor="password" style={{ color: "#bbb", fontSize: "0.9rem", fontWeight: "500" }}>
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{
-                width: "100%",
-                backgroundColor: "#1e1e1e",
-                color: "#fff",
-                border: "1px solid #444",
-                borderRadius: "8px",
-                padding: "0.75rem",
-                fontSize: "1rem",
-                marginTop: "0.25rem",
-              }}
-            />
-          </div>
-
           <button
             className="auth-button"
             type="submit"
+            disabled={loading}
             style={{
-              backgroundColor: "#6366f1",
+              backgroundColor: loading ? "#4a4a4a" : "#6366f1",
               color: "white",
               fontWeight: "600",
               border: "none",
               borderRadius: "8px",
               padding: "0.75rem",
               fontSize: "1rem",
-              cursor: "pointer",
+              cursor: loading ? "not-allowed" : "pointer",
               width: "100%",
               transition: "background-color 0.3s",
             }}
-            onMouseOver={(e) => (e.target.style.backgroundColor = "#4f46e5")}
-            onMouseOut={(e) => (e.target.style.backgroundColor = "#6366f1")}
+            onMouseOver={(e) => !loading && (e.target.style.backgroundColor = "#4f46e5")}
+            onMouseOut={(e) => !loading && (e.target.style.backgroundColor = "#6366f1")}
           >
-            Log In
+            {loading ? "Sending..." : "Send Reset Instructions"}
           </button>
         </form>
 
         <div className="auth-footer" style={{ textAlign: "center", marginTop: "1rem", fontSize: "0.9rem" }}>
-          <p style={{ color: "#aaa", marginBottom: "0.5rem" }}>
-            <Link to="/password-reset" style={{ color: "#6366f1", textDecoration: "none" }}>
-              Forgot Password?
-            </Link>
-          </p>
           <p style={{ color: "#aaa" }}>
-            Don't have an account?{" "}
-            <Link to="/signup" style={{ color: "#6366f1", textDecoration: "none" }}>
-              Sign up
+            Remember your password?{" "}
+            <Link to="/login" style={{ color: "#6366f1", textDecoration: "none" }}>
+              Log in
             </Link>
           </p>
         </div>
@@ -242,4 +192,4 @@ function Login({ onLogin }) {
   );
 }
 
-export default Login;
+export default PasswordReset;

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/FriendSystem.css";
 
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function FriendSystem({ currentUserEmail, onFriendUpdate }) {
+function FriendSystem({ currentUserEmail }) {
   const [searchEmail, setSearchEmail] = useState("");
   const [user, setUser] = useState(null);
   const [searchError, setSearchError] = useState("");
@@ -279,28 +279,26 @@ function FriendSystem({ currentUserEmail, onFriendUpdate }) {
 
       if (error) {
         console.error("Error responding to friend request:", error);
-        setRequestError(`Failed to ${status === "accepted" ? "accept" : "reject"} friend request: ${error.message}`);
+        setRequestError(`Failed to ${status === "accepted" ? "accept" : "reject"} friend request: ${error.message || error.details || "Unknown error"}`);
         return;
       }
 
-      // Clear any existing error messages
-      setRequestError("");
+      console.log(`Successfully updated request ${requestId} to ${status}`);
 
-      // Force immediate refresh of friend data
-      await Promise.all([
-        fetchFriendRequests(),
-        fetchFriends(),
-        fetchOutgoingRequests()
-      ]);
+      // Show a temporary success message
+      setRequestError(`Successfully ${status === "accepted" ? "accepted" : "rejected"} the friend request!`);
 
-      // Call the callback to update the sidebar
-      if (onFriendUpdate) {
-        console.log("Triggering parent update from FriendSystem");
-        await onFriendUpdate();
-      }
+      // Clear the success message after 3 seconds
+      setTimeout(() => {
+        setRequestError("");
+      }, 3000);
+
+      // Refresh the data
+      fetchFriendRequests();
+      fetchFriends();
     } catch (unexpectedError) {
       console.error("Unexpected error in respondToRequest:", unexpectedError);
-      setRequestError(`Unexpected error: ${unexpectedError.message}`);
+      setRequestError(`Unexpected error: ${unexpectedError.message || "Unknown error occurred"}`);
     }
   };
 
@@ -363,9 +361,6 @@ function FriendSystem({ currentUserEmail, onFriendUpdate }) {
       }, 3000);
 
       // Refresh the data
-      if(onFriendUpdate) { 
-        onFriendUpdate();
-      }
       fetchFriends();
     } catch (unexpectedError) {
       console.error("Unexpected error in removeFriend:", unexpectedError);
@@ -375,6 +370,7 @@ function FriendSystem({ currentUserEmail, onFriendUpdate }) {
 
   // --- Fetch Accepted Friends ---
   const fetchFriends = async () => {
+    // Check if currentUserEmail is valid
     if (!currentUserEmail) {
       console.error("No user email provided to fetchFriends");
       setFriendError("Error: No user email available. Please log in again.");
@@ -382,7 +378,7 @@ function FriendSystem({ currentUserEmail, onFriendUpdate }) {
     }
 
     try {
-      console.log("Fetching friends for:", currentUserEmail);
+      console.log("Fetching accepted friends for:", currentUserEmail);
 
       const { data, error } = await supabase
         .from("friend_requests")
@@ -390,44 +386,94 @@ function FriendSystem({ currentUserEmail, onFriendUpdate }) {
         .or(`sender_email.eq.${currentUserEmail},receiver_email.eq.${currentUserEmail}`)
         .eq("status", "accepted");
 
-      console.log("Raw friend request data:", data);
-
       if (error) {
         console.error("Error fetching friends:", error);
-        setFriendError(`Database error: ${error.message}`);
+        setFriendError(`Database error: ${error.message || error.details || "Unknown error"}`);
         return;
       }
 
-      const friendList = data.map((req) =>
-        req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
-      );
+      // Check if data is null or undefined
+      if (!data) {
+        console.error("No data returned when fetching friends");
+        setFriendError("Warning: No data returned from the database.");
+        setFriends([]);
+        return;
+      }
 
-      console.log("Updated friends list:", friendList);
-      setFriends(friendList);
-      setFriendError("");
-    } catch (error) {
-      console.error("Unexpected error in fetchFriends:", error);
-      setFriendError(`Unexpected error: ${error.message}`);
+      console.log("Accepted friends data from Supabase:", data);
+
+      // Check if data is empty
+      if (data.length === 0) {
+        console.log("No accepted friends found for user:", currentUserEmail);
+        setFriendError(""); // Clear any previous errors
+        setFriends([]);
+        return;
+      }
+
+      try {
+        const friendList = data.map((req) =>
+          req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
+        );
+
+        console.log("Processed friend list:", friendList);
+        setFriends(friendList);
+        setFriendError("");
+      } catch (mapError) {
+        console.error("Error processing friend data:", mapError);
+        setFriendError(`Error processing friend data: ${mapError.message || "Unknown error"}`);
+        setFriends([]);
+      }
+    } catch (unexpectedError) {
+      console.error("Unexpected error in fetchFriends:", unexpectedError);
+      setFriendError(`Unexpected error: ${unexpectedError.message || "Unknown error occurred"}`);
     }
-  };
-
-  //refresh friends list button
-  const refreshFriendsList =  () => {
-    console.log("Refreshing friends list");
-    fetchFriendRequests();
-    fetchFriends();
-    fetchOutgoingRequests()
   };
 
   // --- Load on mount and when currentUserEmail changes ---
   useEffect(() => {
-    if (!currentUserEmail) return;
+    console.log("FriendSystem useEffect triggered with currentUserEmail:", currentUserEmail);
 
-    // Initial data fetch
+    if (!currentUserEmail) {
+      console.log("No currentUserEmail available, skipping data fetch");
+      return;
+    }
+
+    // Fetch all types of friend data
     fetchFriendRequests();
     fetchFriends();
     fetchOutgoingRequests();
-  }, [currentUserEmail]);
+
+    // Set up real-time subscription for friend request changes
+    const subscription = supabase
+      .channel("friend-requests")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friend_requests" },
+        (payload) => {
+          console.log("Friend request change detected:", payload);
+          fetchFriendRequests();
+          fetchFriends();
+          fetchOutgoingRequests();
+        }
+      )
+      .subscribe();
+
+    console.log("Supabase real-time subscription set up for friend requests");
+
+    return () => {
+      console.log("Cleaning up Supabase subscription");
+      supabase.removeChannel(subscription);
+    };
+  }, [currentUserEmail]); // Re-run when currentUserEmail changes
+
+  // Function to manually refresh all friend data
+  const refreshFriendData = () => {
+    console.log("Manual refresh triggered");
+    fetchFriendRequests();
+    fetchFriends();
+    fetchOutgoingRequests();
+    testDatabaseConnection();
+  };
 
   // States for debugging and additional functionality
   const [allRequests, setAllRequests] = useState([]);
@@ -442,10 +488,10 @@ function FriendSystem({ currentUserEmail, onFriendUpdate }) {
     try {
       setConnectionStatus("Testing...");
 
-      // Simple query to test connection without using aggregate functions
+      // Simple query to test connection
       const { data, error } = await supabase
         .from("friend_requests")
-        .select("id")
+        .select("count()", { count: "exact" })
         .limit(1);
 
       if (error) {
@@ -635,7 +681,7 @@ function FriendSystem({ currentUserEmail, onFriendUpdate }) {
         <div className="friend-section">
           <div className="friend-section-header">
             <h3>Incoming Friend Requests</h3>
-            <button className="btn btn-secondary" onClick={refreshFriendsList}>
+            <button className="btn btn-secondary" onClick={refreshFriendData}>
               Refresh
             </button>
           </div>

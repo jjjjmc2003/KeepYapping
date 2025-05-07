@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
+import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/HomePage.css";
 import ChatApp from "./ChatApp";
 import FriendSystem from "./FriendSystem";
+import ProfileEditor from "./ProfileEditor";
 
 // Supabase Setup
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Custom Role Map (same as in ChatApp)
 const emailToRole = {
@@ -140,14 +141,9 @@ function HomePage({ onLogout }) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "friend_requests" },
-        async (payload) => {
-          console.log("HomePage received real-time update:", payload);
-          // Refresh sidebar data
-          await refreshFriendsList();
-          // Force immediate refresh of FriendSystem data if we're on that page
-          if (activeSection === "friends") {
-            console.log("Triggering FriendSystem refresh from HomePage");
-          }
+        (payload) => {
+          fetchFriends();
+          fetchPendingRequests();
         }
       )
       .subscribe();
@@ -155,7 +151,7 @@ function HomePage({ onLogout }) {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [userEmail, activeSection]);
+  }, [userEmail]);
 
   // Handle logout
   const handleLogout = async () => {
@@ -166,24 +162,36 @@ function HomePage({ onLogout }) {
     navigate("/login");
   };
 
+  // Handle profile updates
+  const handleProfileUpdate = (profileData) => {
+    // Update the user name in the UI
+    setUserName(profileData.displayname || profileData.name || userEmail);
+
+    // Refresh friends list to update any display name changes
+    refreshFriendsList();
+  };
+
   // Render content based on active section
   const renderContent = () => {
     switch (activeSection) {
       case "home":
         return (
-          <div className="welcome-message">
-            <h1>Welcome to KeepYapping!</h1>
-            <p>
-              Connect with friends, chat with your organization, and create private groups.
-              Select an option from the sidebar to get started.
-            </p>
+          <div className="home-content">
+            <div className="welcome-message">
+              <h1>Welcome to KeepYapping!</h1>
+              <p>
+                Connect with friends, chat with your organization, and create private groups.
+                Select an option from the sidebar to get started.
+              </p>
+            </div>
+            <ProfileEditor
+              userEmail={userEmail}
+              onProfileUpdate={handleProfileUpdate}
+            />
           </div>
         );
       case "friends":
-        return <FriendSystem 
-          currentUserEmail={userEmail} 
-          onFriendUpdate={refreshFriendsList}
-        />;
+        return <FriendSystem currentUserEmail={userEmail} />;
       case "chat":
         return <ChatApp userEmail={userEmail} selectedFriend={selectedFriend} />;
       default:
