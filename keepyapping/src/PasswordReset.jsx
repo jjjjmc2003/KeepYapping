@@ -28,7 +28,27 @@ function PasswordReset() {
     }
 
     try {
-      console.log("Sending password reset email to:", email);
+      console.log("Checking if email exists:", email);
+
+      // First check if the email exists in the users table
+      const { data: existingUser, error: userCheckError } = await supabase
+        .from("users")
+        .select("email")
+        .eq("email", email)
+        .single();
+
+      if (userCheckError && userCheckError.code !== "PGRST116") {
+        console.error("Error checking if email exists:", userCheckError);
+      }
+
+      // If no user found with this email
+      if (!existingUser) {
+        setError("Not a valid email");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Email exists, sending password reset email to:", email);
 
       // Use Supabase's password reset functionality with exact URL
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
