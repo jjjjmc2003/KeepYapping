@@ -1,0 +1,31 @@
+To complete the implementation of the notification system, you'll need to:
+
+1. Install the react-hot-toast package:
+```
+npm install react-hot-toast
+```
+
+2. Run the SQL script to create the notification tables:
+- Open the Supabase dashboard
+- Go to the SQL Editor
+- Copy and paste the content from notification_system.sql
+- Run the script
+
+3. Test the notification system:
+- Send a message in the global chat
+- Send a direct message to a friend
+- Create a group chat and send a message
+- Verify that notifications appear correctly
+
+The implementation includes:
+- Database tables for tracking message status
+- A trigger function to handle new messages
+- A React context provider for notifications
+- Integration with the existing UI
+
+This provides a solid foundation for the three-layer notification system:
+- Layer 1: In-app toasts and badges (implemented)
+- Layer 2: Push notifications (ready for implementation)
+- Layer 3: Email digests (ready for implementation)
+
+You can extend this system in the future to add push notifications and email digests as described in the design.
