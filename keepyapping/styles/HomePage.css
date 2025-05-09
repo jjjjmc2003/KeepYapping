@@ -281,6 +281,36 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* Notification badge for unread messages */
+.notification-badge {
+  color: var(--warning-color);
+  font-weight: bold;
+  animation: pulse 2s infinite;
+  display: inline-block;
+  margin-left: 5px;
+}
+
+/* Make notification badges more visible */
+.friend-name .notification-badge,
+.nav-text .notification-badge,
+.friends-title .notification-badge {
+  color: var(--warning-color);
+  font-weight: bold;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
+
 /* Main content area */
 .main-content {
   flex: 1;

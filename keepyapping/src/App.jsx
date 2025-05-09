@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from 'react-hot-toast';
 import ChatApp from "./ChatApp";
 import Login from "./Login";
 import Signup from "./Signup";
@@ -8,6 +9,7 @@ import PasswordReset from "./PasswordReset";
 import ResetPasswordWrapper from "./ResetPasswordWrapper";
 import RouteHandler from "./RouteHandler";
 import CreateGroupChat from "./CreateGroupChat";
+import { NotificationProvider } from "./NotificationContext";
 
 // Import Supabase
 import * as SupabaseClient from "@supabase/supabase-js";
@@ -89,31 +91,36 @@ function App() {
 
   return (
     <Router>
-      <RouteHandler>
-        <div>
-          <Routes>
-            {/* Always accessible routes */}
-            <Route path="/reset-password" element={<ResetPasswordWrapper />} />
-            <Route path="/password-reset" element={<PasswordReset />} />
+      <NotificationProvider>
+        <RouteHandler>
+          <div>
+            {/* Toast notifications container */}
+            <Toaster position="top-right" />
 
-            {/* Conditional routes based on authentication */}
-            {!user ? (
-              <>
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/login" element={<Login onLogin={setUser} />} />
-                <Route path="*" element={<Login onLogin={setUser} />} />
-              </>
-            ) : (
-              <>
-                <Route path="/" element={<HomePage onLogout={() => setUser(null)} />} />
-                <Route path="/chat" element={<ChatApp onLogout={() => setUser(null)} />} />
-                <Route path="/create-group" element={<CreateGroupChat currentUserEmail={user.email} />} />
-                <Route path="*" element={<HomePage onLogout={() => setUser(null)} />} />
-              </>
-            )}
-          </Routes>
-        </div>
-      </RouteHandler>
+            <Routes>
+              {/* Always accessible routes */}
+              <Route path="/reset-password" element={<ResetPasswordWrapper />} />
+              <Route path="/password-reset" element={<PasswordReset />} />
+
+              {/* Conditional routes based on authentication */}
+              {!user ? (
+                <>
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/login" element={<Login onLogin={setUser} />} />
+                  <Route path="*" element={<Login onLogin={setUser} />} />
+                </>
+              ) : (
+                <>
+                  <Route path="/" element={<HomePage onLogout={() => setUser(null)} />} />
+                  <Route path="/chat" element={<ChatApp onLogout={() => setUser(null)} />} />
+                  <Route path="/create-group" element={<CreateGroupChat currentUserEmail={user.email} />} />
+                  <Route path="*" element={<HomePage onLogout={() => setUser(null)} />} />
+                </>
+              )}
+            </Routes>
+          </div>
+        </RouteHandler>
+      </NotificationProvider>
     </Router>
   );
 }
