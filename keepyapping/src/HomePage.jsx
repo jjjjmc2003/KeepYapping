@@ -760,18 +760,7 @@ function HomePage({ onLogout }) {
     }
   };
 
-  // Debug function to manually check notification status
-  const checkNotificationStatus = async () => {
-    console.log("DEBUG: Manual notification check triggered");
-    console.log("DEBUG: Current notification states:");
-    console.log("- unreadGlobalChat:", unreadGlobalChat);
-    console.log("- unreadFriendMessages:", unreadFriendMessages);
-    console.log("- unreadGroupMessages:", unreadGroupMessages);
 
-    // Force a refresh of friends and groups
-    refreshFriendsList();
-    initializeGroupChats();
-  };
 
   // Render content based on active section
   const renderContent = () => {
@@ -805,39 +794,6 @@ function HomePage({ onLogout }) {
           userEmail={userEmail}
           onProfileUpdate={handleProfileUpdate}
         />
-        <div style={{ marginTop: '20px', textAlign: 'center' }}>
-          <button
-            onClick={checkNotificationStatus}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#4a5568',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              marginRight: '10px'
-            }}
-          >
-            Check Notification Status
-          </button>
-
-          <button
-            onClick={() => {
-              console.log("DEBUG: This button is no longer needed with the NotificationContext");
-              alert("Please use the Test Notifications button in the sidebar instead.");
-            }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#553c9a',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Test Notifications
-          </button>
-        </div>
       </div>
     );
   };
@@ -1105,7 +1061,6 @@ function HomePage({ onLogout }) {
                     </span>
                   )}
                 </div>
-                <div className="friend-status">Online</div>
               </div>
             </div>
           ))}

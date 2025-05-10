@@ -21,12 +21,9 @@ function FriendSystem({ currentUserEmail }) {
   const [friends, setFriends] = useState([]);
   const [friendError, setFriendError] = useState("");
 
-  // --- Debug Log and Initial Connection Test ---
+  // --- Debug Log ---
   useEffect(() => {
     console.log("CurrentUserEmail passed into FriendSystem:", currentUserEmail);
-
-    // Test database connection on component mount
-    testDatabaseConnection();
   }, []);
 
   // --- Handle Click Outside for Suggestions Dropdown ---
@@ -608,49 +605,11 @@ function FriendSystem({ currentUserEmail }) {
     };
   }, [currentUserEmail]); // Re-run when currentUserEmail changes
 
-  // Function to manually refresh all friend data
-  const refreshFriendData = () => {
-    console.log("Manual refresh triggered");
-    fetchFriendRequests();
-    fetchFriends();
-    fetchOutgoingRequests();
-    testDatabaseConnection();
-  };
-
-  // States for debugging and additional functionality
-  const [allRequests, setAllRequests] = useState([]);
-  const [allRequestsError, setAllRequestsError] = useState("");
-  const [connectionStatus, setConnectionStatus] = useState("Unknown");
+  // States for friend management
   const [outgoingRequests, setOutgoingRequests] = useState([]);
   const [outgoingRequestsError, setOutgoingRequestsError] = useState("");
-  const [showDebug, setShowDebug] = useState(false);
 
-  // Function to test database connection
-  const testDatabaseConnection = async () => {
-    try {
-      setConnectionStatus("Testing...");
 
-      // Simple query to test connection
-      const { data, error } = await supabase
-        .from("friend_requests")
-        .select("count()", { count: "exact" })
-        .limit(1);
-
-      if (error) {
-        console.error("Database connection test failed:", error);
-        setConnectionStatus(`Failed: ${error.message || error.details || "Unknown error"}`);
-        return false;
-      }
-
-      console.log("Database connection test successful:", data);
-      setConnectionStatus("Connected");
-      return true;
-    } catch (error) {
-      console.error("Unexpected error testing database connection:", error);
-      setConnectionStatus(`Error: ${error.message || "Unknown error"}`);
-      return false;
-    }
-  };
 
   // Function to fetch outgoing friend requests
   const fetchOutgoingRequests = async () => {
@@ -718,54 +677,7 @@ function FriendSystem({ currentUserEmail }) {
     }
   };
 
-  const fetchAllFriendRequests = async () => {
-    if (!currentUserEmail) {
-      setAllRequestsError("No user email available");
-      return;
-    }
 
-    try {
-      console.log("Fetching ALL friend requests for debugging");
-
-      // First query: requests where user is the receiver
-      const { data: receivedData, error: receivedError } = await supabase
-        .from("friend_requests")
-        .select("*")
-        .ilike("receiver_email", currentUserEmail);
-
-      if (receivedError) {
-        console.error("Error fetching received requests:", receivedError);
-        setAllRequestsError(`Error fetching received requests: ${receivedError.message}`);
-        return;
-      }
-
-      // Second query: requests where user is the sender
-      const { data: sentData, error: sentError } = await supabase
-        .from("friend_requests")
-        .select("*")
-        .ilike("sender_email", currentUserEmail);
-
-      if (sentError) {
-        console.error("Error fetching sent requests:", sentError);
-        setAllRequestsError(`Error fetching sent requests: ${sentError.message}`);
-        return;
-      }
-
-      // Combine both sets of data
-      const combined = [...(receivedData || []), ...(sentData || [])];
-      console.log("All friend requests (both sent and received):", combined);
-
-      setAllRequests(combined);
-      setAllRequestsError("");
-
-      // Also update outgoing requests while we're at it
-      const pendingSent = (sentData || []).filter(req => req.status === "pending");
-      setOutgoingRequests(pendingSent);
-    } catch (error) {
-      console.error("Unexpected error fetching all requests:", error);
-      setAllRequestsError(`Unexpected error: ${error.message}`);
-    }
-  };
 
   return (
     <div className="friend-system">
@@ -1040,106 +952,7 @@ function FriendSystem({ currentUserEmail }) {
           ))}
         </div>
 
-        {/* Debug Toggle Button */}
-        <div className="friend-section">
-          <button
-            className="btn btn-secondary"
-            style={{ width: "100%" }}
-            onClick={() => setShowDebug(!showDebug)}
-          >
-            {showDebug ? "Hide Debug Information" : "Show Debug Information"}
-          </button>
-        </div>
 
-        {/* Debug Section - Toggleable */}
-        {showDebug && (
-          <div className="friend-section debug-section">
-            <div className="friend-section-header">
-              <h3>Debug Information</h3>
-            </div>
-
-            <div className="debug-info">
-              <p><strong>Current User Email:</strong> {currentUserEmail || "Not set"}</p>
-              <p>
-                <strong>Database Connection:</strong>
-                <span style={{
-                  color: connectionStatus === "Connected" ? "var(--success-color)" :
-                        connectionStatus === "Testing..." ? "var(--info-color)" : "var(--danger-color)",
-                  fontWeight: "bold"
-                }}>
-                  {connectionStatus}
-                </span>
-              </p>
-              <p><strong>Incoming Requests:</strong> {requests.length}</p>
-              <p><strong>Outgoing Requests:</strong> {outgoingRequests.length}</p>
-              <p><strong>Remove Friends:</strong> {friends.length}</p>
-              <p><strong>All Requests:</strong> {allRequests.length}</p>
-
-              {outgoingRequestsError && (
-                <div className="warning-message">
-                  <strong>Outgoing Requests Error:</strong> {outgoingRequestsError}
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: "10px", marginBottom: "10px", marginTop: "15px" }}>
-                <button
-                  className="btn btn-secondary"
-                  onClick={testDatabaseConnection}
-                >
-                  Test Connection
-                </button>
-
-                <button
-                  className="btn btn-secondary"
-                  onClick={fetchAllFriendRequests}
-                >
-                  Fetch All Requests
-                </button>
-
-                <button
-                  className="btn btn-secondary"
-                  onClick={refreshFriendData}
-                >
-                  Manual Refresh
-                </button>
-              </div>
-
-              {allRequestsError && (
-                <div className="error-message">
-                  <strong>Debug Error:</strong> {allRequestsError}
-                </div>
-              )}
-
-              <details className="debug-details">
-                <summary>Incoming Friend Requests (Pending)</summary>
-                <pre>
-                  {JSON.stringify(requests, null, 2) || "No data"}
-                </pre>
-              </details>
-
-              <details className="debug-details">
-                <summary>Outgoing Friend Requests (Pending)</summary>
-                <pre>
-                  {JSON.stringify(outgoingRequests, null, 2) || "No data"}
-                </pre>
-              </details>
-
-              <details className="debug-details">
-                <summary>Friends (Accepted)</summary>
-                <pre>
-                  {JSON.stringify(friends, null, 2) || "No data"}
-                </pre>
-              </details>
-
-              <details className="debug-details">
-                <summary>ALL Friend Requests</summary>
-                <pre>
-                  {JSON.stringify(allRequests, null, 2) || "No data"}
-                </pre>
-              </details>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
