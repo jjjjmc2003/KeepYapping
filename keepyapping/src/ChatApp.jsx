@@ -17,19 +17,52 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
   const messageEndRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [storageReady, setStorageReady] = useState(true);
+  // Track if user has manually scrolled
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
 
- 
- 
-  useEffect(() => {
-    // Use a small timeout to ensure the DOM has updated
-    const scrollTimeout = setTimeout(() => {
-      if (messageEndRef.current) {
-        messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+  // Function to scroll to bottom
+  const scrollToBottom = () => {
+    if (messageEndRef.current) {
+      messageEndRef.current.scrollTop = messageEndRef.current.scrollHeight;
+    }
+  };
+
+  // Handle scroll events
+  const handleScroll = () => {
+    if (messageEndRef.current) {
+      // If user scrolls up, mark that they've manually scrolled
+      if (messageEndRef.current.scrollHeight - messageEndRef.current.scrollTop > messageEndRef.current.clientHeight + 100) {
+        setUserHasScrolled(true);
+      } else {
+        // If they scroll near the bottom, reset the flag
+        setUserHasScrolled(false);
       }
-    }, 100);
+    }
+  };
 
-    return () => clearTimeout(scrollTimeout);
-  }, [messages]);
+  // Add and remove scroll event listener
+  useEffect(() => {
+    const messageContainer = messageEndRef.current;
+    if (messageContainer) {
+      messageContainer.addEventListener('scroll', handleScroll);
+      return () => {
+        messageContainer.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, []);
+
+  // Scroll to bottom when changing chats
+  useEffect(() => {
+    scrollToBottom();
+    setUserHasScrolled(false); // Reset scroll flag when changing chats
+  }, [chatMode, selectedUser, selectedGroupChat]);
+
+  // Auto-scroll for new messages only if user hasn't manually scrolled
+  useEffect(() => {
+    if (!userHasScrolled) {
+      scrollToBottom();
+    }
+  }, [messages, userHasScrolled]);
 
   // Set up storage bucket for images
   useEffect(() => {
@@ -278,6 +311,8 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
 
       // Add to messages state immediately
       setMessages(prevMessages => [...prevMessages, optimisticMessage]);
+      // Reset the scroll flag when user sends a message
+      setUserHasScrolled(false);
 
       // Insert the message in the database
       const { error } = await supabase
@@ -340,10 +375,12 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       };
 
       setMessages(prevMessages => [...prevMessages, optimisticMessage]);
+      // Reset the scroll flag when user sends an image
+      setUserHasScrolled(false);
 
       const { error } = await supabase
-      .from("messages") 
-      .insert([messageData]); 
+      .from("messages")
+      .insert([messageData]);
 
         if (error) {
           console.error("Error sending image message:", error);
@@ -363,7 +400,7 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
 
 //handles paste event for images
   const handlePaste = async (event) => {
-  const clipboardData = event.clipboardData; 
+  const clipboardData = event.clipboardData;
   if (!clipboardData || !clipboardData.items) return;
 
   // Check if the clipboard contains image data
@@ -372,7 +409,7 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
     if (items[i].type.indexOf("image") !== -1) { // Fix: indexOf instead of indextOf
       console.log("Image found in clipboard, uploading...");
       event.preventDefault();
-      
+
       if (!storageReady) {
         alert("Storage is not ready. Please try again later.");
         return;
@@ -383,15 +420,15 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
         alert("File size exceeds 5MB limit.");
         return;
       }
-      
+
       const timestamp = Date.now();
       const filename = `clipboard-image-${timestamp}.png`;
-      
+
       // Create a named file from the clipboard file
       const namedFile = new File([file], filename, { type: file.type });
 
       setIsUploading(true);
-      
+
       try {
         const imageUrl = await uploadImage(namedFile);
         const messageData = {
@@ -403,20 +440,22 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
           media_url: imageUrl,
           message_type: "image"
         };
-        
+
         if (chatMode === "groupchat" && selectedGroupChat) {
           messageData.recipient = `group:${selectedGroupChat.id}`;
         }
-        
+
         const optimisticMessage = {
           ...messageData,
-          id: `temp-${timestamp}`, 
+          id: `temp-${timestamp}`,
         };
-        
+
         setMessages(prevMessages => [...prevMessages, optimisticMessage]);
-        
+        // Reset the scroll flag when user sends a pasted image
+        setUserHasScrolled(false);
+
         const { error } = await supabase.from("messages").insert([messageData]);
-        
+
         if (error) {
           console.error("Error sending pasted image message:", error);
           setMessages(prevMessages =>
@@ -427,14 +466,14 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
         console.error("Error uploading pasted image:", error);
         alert("Error uploading pasted image. Please try again.");
       } finally {
-        setIsUploading(false); 
+        setIsUploading(false);
       }
       break;
     }
   }
 
 };
-  
+
 
 
   //sets up the storage bucket for images
@@ -443,12 +482,12 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       console.log("Setting up storage bucket");
       const { data: buckets, error: listError } = await supabase.storage.listBuckets();
       console.log("Buckets:", buckets);
-      
+
       if (listError) {
         console.error("Error listing buckets:", listError);
         throw new Error(`Failed to list buckets: ${listError.message}`);
       }
-      
+
       if (!buckets.find(bucket => bucket.name === "chat-images")) {
         console.error("Chat images bucket not found. Please create it in the Supabase dashboard.");
         alert("Image storage is not properly configured. Please contact an administrator.");
@@ -469,29 +508,29 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       const fileExtension = file.name.split(".").pop();
       const fileName = `${Date.now()}.${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
       const filePath = `${userEmail}/${fileName}`;
-      
+
       console.log("Attempting to upload file to path:", filePath);
-      
+
       // Upload the image to Supabase storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from("chat-images")
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         });
-  
+
       if (error) {
         console.error("Upload error details:", error);
         throw new Error("Error uploading image: " + error.message);
       }
-  
+
       console.log("File uploaded successfully, getting public URL");
-      
+
       // Get the public URL of the uploaded image
       const { data: { publicUrl } } = supabase.storage
         .from("chat-images")
         .getPublicUrl(filePath);
-      
+
       return publicUrl;
     } catch (error) {
       console.error("Full upload error:", error);
@@ -543,19 +582,20 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
           </button>
         )}
       </div>
-  
+
       {/* Chat messages container  */}
       <div
+        ref={messageEndRef}
         style={{
           flexGrow: 1,
-          height: "calc(85vh - 130px)", 
+          height: "calc(85vh - 130px)",
           overflowY: "auto",
           padding: "15px",
           backgroundColor: "#2b2d31",
           display: "flex",
           flexDirection: "column",
           gap: "10px",
-          borderRadius: "10px 10px 0 0", 
+          borderRadius: "10px 10px 0 0",
         }}
       >
         {messages.length === 0 ? (
@@ -577,17 +617,17 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
               <div style={{ fontSize: "0.75rem", fontWeight: "bold", opacity: 0.8 }}>
                 {userDisplayNames[msg.sender] || msg.sender}
               </div>
-  
+
               {msg.message_type === "image" ? (
                 <div>
-                  <img 
-                    src={msg.media_url} 
+                  <img
+                    src={msg.media_url}
                     alt={msg.text || "Shared image"}
-                    style={{ 
-                      maxWidth: "100%", 
-                      maxHeight: "300px", 
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "300px",
                       borderRadius: "8px",
-                      cursor: "pointer" 
+                      cursor: "pointer"
                     }}
                     onClick={() => window.open(msg.media_url, '_blank')}
                   />
@@ -599,15 +639,15 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
             </div>
           ))
         )}
-        <div ref={messageEndRef} />
+        {/* We don't need this anymore since we're using the container ref */}
       </div>
-  
+
       {/* Separate input area */}
-      <div 
+      <div
         style={{
           backgroundColor: "#2b2d31",
           padding: "12px 15px",
-          borderRadius: "0 0 10px 10px", 
+          borderRadius: "0 0 10px 10px",
           display: "flex",
           flexDirection: "column",
           gap: "8px",
@@ -634,15 +674,15 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
               fontSize: "1rem",
             }}
           />
-          
-          <input 
+
+          <input
             type="file"
             id="image-upload"
             accept="image/*"
             onChange={hangleImageSelected}
             style={{display: "none"}}
           />
-          
+
           <label htmlFor="image-upload" style={{
             marginLeft: "8px",
             padding: "12px",
@@ -656,7 +696,7 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
           }}>
             📷
           </label>
-          
+
           <button
             onClick={sendMessage}
             style={{
@@ -673,7 +713,7 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
             Send
           </button>
         </div>
-        
+
         {/* Upload status indicator */}
         {isUploading && (
           <div style={{ color: "#999", textAlign: "left" }}>
