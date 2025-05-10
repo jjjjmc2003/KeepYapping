@@ -565,7 +565,7 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       {/* Header with title */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3>{getChatTitle()}</h3>
-        {chatMode === "groupchat" && selectedGroupChat && onDeleteGroupChat && (
+        {chatMode === "groupchat" && selectedGroupChat && onDeleteGroupChat && selectedGroupChat.creator === userEmail && (
           <button
             onClick={() => onDeleteGroupChat(selectedGroupChat.id)}
             style={{

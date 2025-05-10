@@ -1110,16 +1110,18 @@ function HomePage({ onLogout }) {
                   <div className="friend-status">Group</div>
                 </div>
               </div>
-              <button
-                className="delete-group-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteGroupChat(chat.id);
-                }}
-                title="Delete group chat"
-              >
-                ✕
-              </button>
+              {chat.creator === userEmail && (
+                <button
+                  className="delete-group-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteGroupChat(chat.id);
+                  }}
+                  title="Delete group chat"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           ))}
         </div>
