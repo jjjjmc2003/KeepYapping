@@ -266,6 +266,7 @@
 .friend-info {
   flex: 1;
   overflow: hidden;
+  max-width: calc(var(--sidebar-width) - 80px); /* Limit width to ensure text truncation */
 }
 
 .friend-name {

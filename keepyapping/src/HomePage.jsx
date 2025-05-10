@@ -1131,7 +1131,7 @@ function HomePage({ onLogout }) {
                 )}
               </div>
               <div className="friend-info">
-                <div className="friend-name">
+                <div className="friend-name" title={friendDisplayNames[friend] || friend}>
                   {friendDisplayNames[friend] || friend}
                   {((unreadFriendMessages && unreadFriendMessages[friend]) ||
                     (localUnreadFriendMessages && localUnreadFriendMessages[friend])) && (
@@ -1177,7 +1177,7 @@ function HomePage({ onLogout }) {
                   {chat.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="friend-info">
-                  <div className="friend-name">
+                  <div className="friend-name" title={chat.name}>
                     {chat.name}
                     {((unreadGroupMessages && unreadGroupMessages[chat.id]) ||
                       (localUnreadGroupMessages && localUnreadGroupMessages[chat.id])) && (
