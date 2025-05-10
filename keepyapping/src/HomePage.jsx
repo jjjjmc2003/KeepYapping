@@ -921,15 +921,6 @@ function HomePage({ onLogout }) {
             <div className="nav-text">
               Friends
               {pendingRequests.length > 0 && ` (${pendingRequests.length})`}
-              {((unreadFriendMessages && Object.keys(unreadFriendMessages).length > 0) ||
-                (localUnreadFriendMessages && Object.keys(localUnreadFriendMessages).length > 0)) && (
-                <span style={{ color: '#ff5555', fontWeight: 'bold', marginLeft: '5px' }}>
-                  (New: {Math.max(
-                    Object.keys(unreadFriendMessages || {}).length,
-                    Object.keys(localUnreadFriendMessages || {}).length
-                  )})
-                </span>
-              )}
             </div>
           </div>
 
