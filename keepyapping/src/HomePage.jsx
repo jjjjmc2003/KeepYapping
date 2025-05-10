@@ -529,6 +529,93 @@ function HomePage({ onLogout }) {
     setSelectedGroupChat(newGroupChat);
   };
 
+  // Handle leaving a group chat
+  const handleLeaveGroupChat = async (groupChatId) => {
+    // Find the group chat
+    const groupChat = groupChats.find(chat => chat.id === groupChatId);
+    if (!groupChat) {
+      console.error("Group chat not found:", groupChatId);
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to leave the group chat "${groupChat.name}"?`)) {
+      return;
+    }
+
+    try {
+      console.log("Leaving group chat:", groupChatId);
+
+      // 1. First, send a message to notify other members
+      try {
+        const leaveMessage = {
+          text: `${userEmail} has left the group chat`,
+          sender: userEmail,
+          type: "groupchat",
+          recipient: `group:${groupChatId}`,
+          created_at: new Date().toISOString()
+        };
+
+        await supabase
+          .from("messages")
+          .insert([leaveMessage]);
+
+        console.log("Sent group chat leave notification");
+      } catch (notifyError) {
+        console.error("Error sending leave notification:", notifyError);
+        // Not critical, continue anyway
+      }
+
+      // 2. Remove the user from the group_chat_members table
+      const { error: memberError } = await supabase
+        .from("group_chat_members")
+        .delete()
+        .eq("group_id", groupChatId)
+        .eq("member_email", userEmail);
+
+      if (memberError) {
+        console.error("Error removing user from group chat:", memberError);
+        alert("Failed to leave group chat: " + memberError.message);
+        return;
+      }
+
+      console.log("Successfully left group chat");
+
+      // 3. Update localStorage for backward compatibility
+      try {
+        const storedGroupChats = localStorage.getItem('groupChats') || '[]';
+        const parsedGroupChats = JSON.parse(storedGroupChats);
+
+        // Filter out the group chat the user left
+        const updatedGroupChats = parsedGroupChats.filter(chat => chat.id !== groupChatId);
+
+        // Save back to localStorage
+        localStorage.setItem('groupChats', JSON.stringify(updatedGroupChats));
+        console.log("Updated localStorage after leaving group chat");
+
+        // Dispatch a custom event to notify other components
+        window.dispatchEvent(new CustomEvent('groupChatUpdate', {
+          detail: { type: 'leave', chatId: groupChatId, userEmail: userEmail }
+        }));
+      } catch (storageError) {
+        console.error("Error updating localStorage:", storageError);
+      }
+
+      // 4. Update state
+      setGroupChats(prev => prev.filter(chat => chat.id !== groupChatId));
+      setFilteredGroupChats(prev => prev.filter(chat => chat.id !== groupChatId));
+
+      if (selectedGroupChat && selectedGroupChat.id === groupChatId) {
+        setSelectedGroupChat(null);
+        setActiveSection("home");
+      }
+
+      alert("You have left the group chat");
+    } catch (error) {
+      console.error("Unexpected error leaving group chat:", error);
+      alert("An unexpected error occurred: " + error.message);
+    }
+  };
+
   // Handle group chat deletion
   const handleDeleteGroupChat = async (groupChatId) => {
     // Find the group chat
@@ -773,6 +860,7 @@ function HomePage({ onLogout }) {
           selectedGroupChat={selectedGroupChat}
           forceGroupChat={selectedFriend === "" && selectedGroupChat === null}
           onDeleteGroupChat={handleDeleteGroupChat}
+          onLeaveGroupChat={handleLeaveGroupChat}
         />
       );
     }

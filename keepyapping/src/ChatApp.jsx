@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-export default function ChatApp({ userEmail: propUserEmail, selectedFriend, selectedGroupChat, forceGroupChat, onDeleteGroupChat }) {
+export default function ChatApp({ userEmail: propUserEmail, selectedFriend, selectedGroupChat, forceGroupChat, onDeleteGroupChat, onLeaveGroupChat }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -565,22 +565,41 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       {/* Header with title */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3>{getChatTitle()}</h3>
-        {chatMode === "groupchat" && selectedGroupChat && onDeleteGroupChat && selectedGroupChat.creator === userEmail && (
-          <button
-            onClick={() => onDeleteGroupChat(selectedGroupChat.id)}
-            style={{
-              backgroundColor: "#f04747",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              padding: "5px 10px",
-              cursor: "pointer",
-              fontSize: "0.9rem",
-            }}
-          >
-            Delete Group Chat
-          </button>
-        )}
+        <div>
+          {chatMode === "groupchat" && selectedGroupChat && onLeaveGroupChat && selectedGroupChat.creator !== userEmail && (
+            <button
+              onClick={() => onLeaveGroupChat(selectedGroupChat.id)}
+              style={{
+                backgroundColor: "#4f545c",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                padding: "5px 10px",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                marginRight: "8px"
+              }}
+            >
+              Leave Group Chat
+            </button>
+          )}
+          {chatMode === "groupchat" && selectedGroupChat && onDeleteGroupChat && selectedGroupChat.creator === userEmail && (
+            <button
+              onClick={() => onDeleteGroupChat(selectedGroupChat.id)}
+              style={{
+                backgroundColor: "#f04747",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                padding: "5px 10px",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+              }}
+            >
+              Delete Group Chat
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Chat messages container  */}
