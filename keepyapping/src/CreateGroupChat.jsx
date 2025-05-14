@@ -1,7 +1,7 @@
 // This file handles the creation of new group chats
-import React, { useState, useEffect } from "react"; // Import React and hooks for state management
-import { useNavigate } from "react-router-dom"; // Import navigation hook to redirect after creating a group
-import { createClient } from "@supabase/supabase-js"; // Import Supabase client for database operations
+import React, { useState, useEffect } from "react"; 
+import { useNavigate } from "react-router-dom"; 
+import { createClient } from "@supabase/supabase-js"; 
 
 // Connection details for our Supabase database
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co"; // The URL of our Supabase project
@@ -27,7 +27,7 @@ function CreateGroupChat({ currentUserEmail }) {
   useEffect(() => {
     // Function to fetch the user's friends from the database
     async function fetchFriends() {
-      // Step 1: Get all accepted friend requests involving the current user
+      // Get all accepted friend requests involving the current user
       const { data, error } = await supabase
         .from("friend_requests")
         .select("*")
@@ -42,13 +42,12 @@ function CreateGroupChat({ currentUserEmail }) {
         return;
       }
 
-      // Step 2: Extract the email addresses of all friends
       // For each request, get the email of the other person (not the current user)
       const emails = data.map(req =>
         req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
       );
 
-      // Step 3: Get the display names for all these friends
+      //Get the display names for all these friends
       // This helps show friendly names instead of just email addresses
       const { data: users } = await supabase
         .from("users")
@@ -83,7 +82,7 @@ function CreateGroupChat({ currentUserEmail }) {
       return;
     }
 
-    // Step 1: Create the group chat in the database
+    //Create the group chat in the database
     const { data: group, error: groupError } = await supabase
       .from("group_chats")
       .insert([{
@@ -99,7 +98,7 @@ function CreateGroupChat({ currentUserEmail }) {
       return;
     }
 
-    // Step 2: Add all members to the group
+    // Add all members to the group
     // Create an array of member objects including the current user and all selected friends
     const members = [currentUserEmail, ...selectedFriends].map(email => ({
       group_id: group.id, // The ID of the group we just created
