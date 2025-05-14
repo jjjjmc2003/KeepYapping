@@ -849,7 +849,7 @@ function HomePage({ onLogout }) {
       // For each friend, check if there are any unread messages
       for (const friendEmail of Object.keys(lastReadTimestamps)) {
        
-
+        const lastReadTime = lastReadTimestamps[friendEmail] || 0;
         // Skip if we're currently viewing this friend's chat
         if (activeSection === "chat" && selectedFriend === friendEmail) {
           console.log(`DEBUG: Skipping unread check for friend ${friendEmail} (currently viewing)`);
