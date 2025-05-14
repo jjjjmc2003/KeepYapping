@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as SupabaseClient from "@supabase/supabase-js";
 import toast from 'react-hot-toast';
 
@@ -23,30 +23,11 @@ const NotificationContext = createContext();
 const LS_KEY = 'yap_last_read';
 
 /**
- * Debounce function to prevent rapid state updates
- * This helps prevent UI flickering by limiting how often state updates occur
- * @param {Function} func - The function to debounce
- * @param {number} wait - The debounce delay in milliseconds
- * @returns {Function} - The debounced function
- */
-const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
-
-/**
  * Loads the timestamp data of when messages were last read by the user
  *- The email of the current user
- * @param {string} userEmail
+ * @param {string} userEmail 
  * An object containing timestamps for global chat, friends, and groups
- * @returns {Object}
+ * @returns {Object} 
  */
 const loadReadMap = (userEmail) => {
   try {
@@ -74,9 +55,9 @@ const loadReadMap = (userEmail) => {
 /**
  * Saves the timestamp data of when messages were last read by the user
  *- The email of the current user
- * @param {string} userEmail
+ * @param {string} userEmail 
  * - The object containing timestamps for global chat, friends, and groups
- * @param {Object} map
+ * @param {Object} map 
  */
 const saveReadMap = (userEmail, map) => {
   try {
@@ -97,9 +78,9 @@ const saveReadMap = (userEmail, map) => {
  * NotificationProvider component that manages the notification state and logic
  * This component wraps the application and provides notification context to all children
  * Component props
- * @param {Object} props
+ * @param {Object} props 
  * - Child components
- * @param {React.ReactNode} props.children
+ * @param {React.ReactNode} props.children 
  */
 export const NotificationProvider = ({ children }) => {
   // Current authenticated user
@@ -118,37 +99,11 @@ export const NotificationProvider = ({ children }) => {
 
   // Notification states for different chat types
   // Boolean for global chat
-  const [unreadGlobal, setUnreadGlobal] = useState(false);
-  // Object mapping friend emails to boolean
-  const [unreadFriends, setUnreadFriends] = useState({});
+  const [unreadGlobal, setUnreadGlobal] = useState(false);  
+   // Object mapping friend emails to boolean
+  const [unreadFriends, setUnreadFriends] = useState({});  
   // Object mapping group IDs to boolean
-  const [unreadGroups, setUnreadGroups] = useState({});
-
-  // Refs to store the current state values for use in debounced functions
-  const unreadFriendsRef = useRef(unreadFriends);
-  const unreadGroupsRef = useRef(unreadGroups);
-
-  // Update refs when state changes
-  useEffect(() => {
-    unreadFriendsRef.current = unreadFriends;
-  }, [unreadFriends]);
-
-  useEffect(() => {
-    unreadGroupsRef.current = unreadGroups;
-  }, [unreadGroups]);
-
-  // Debounced state update functions to prevent flickering
-  const debouncedSetUnreadFriends = useRef(
-    debounce((newState) => {
-      setUnreadFriends(newState);
-    }, 300) // 300ms debounce time
-  ).current;
-
-  const debouncedSetUnreadGroups = useRef(
-    debounce((newState) => {
-      setUnreadGroups(newState);
-    }, 300) // 300ms debounce time
-  ).current;
+  const [unreadGroups, setUnreadGroups] = useState({});     
 
   /**
    * Effect to get and track the current authenticated user
@@ -346,9 +301,7 @@ export const NotificationProvider = ({ children }) => {
     // Check direct messages from friends
     if (friends.size > 0) {
       const friendsArray = Array.from(friends);
-      // Start with the current state from the ref
-      const newUnreadFriends = { ...unreadFriendsRef.current };
-      let hasChanges = false;
+      const newUnreadFriends = { ...unreadFriends };
 
       for (const friend of friendsArray) {
         try {
@@ -371,25 +324,19 @@ export const NotificationProvider = ({ children }) => {
           } else if (dmMsgs && dmMsgs.length > 0) {
             // Mark this friend as having unread messages
             newUnreadFriends[friend] = true;
-            hasChanges = true;
           }
         } catch (error) {
           console.error(`Error checking messages from ${friend}:`, error);
         }
       }
 
-      // Only update state if there are actual changes
-      if (hasChanges) {
-        debouncedSetUnreadFriends(newUnreadFriends);
-      }
+      setUnreadFriends(newUnreadFriends);
     }
 
     // Check group chat messages
     if (myGroupIds.size > 0) {
       const groupIdsArray = Array.from(myGroupIds);
-      // Start with the current state from the ref
-      const newUnreadGroups = { ...unreadGroupsRef.current };
-      let hasChanges = false;
+      const newUnreadGroups = { ...unreadGroups };
 
       for (const groupId of groupIdsArray) {
         try {
@@ -412,17 +359,13 @@ export const NotificationProvider = ({ children }) => {
           } else if (groupMsgs && groupMsgs.length > 0) {
             // Mark this group as having unread messages
             newUnreadGroups[groupId] = true;
-            hasChanges = true;
           }
         } catch (error) {
           console.error(`Error checking messages in group ${groupId}:`, error);
         }
       }
 
-      // Only update state if there are actual changes
-      if (hasChanges) {
-        debouncedSetUnreadGroups(newUnreadGroups);
-      }
+      setUnreadGroups(newUnreadGroups);
     }
   };
 
@@ -458,12 +401,12 @@ export const NotificationProvider = ({ children }) => {
    * Handles incoming messages from the real-time subscription
    * Updates notification states and shows toast notifications
    *- The payload from Supabase real-time subscription
-   * @param {Object} payload
+   * @param {Object} payload 
    */
   const handleIncomingMessage = (payload) => {
     if (!user) return;
     // The new message that was inserted
-    const msg = payload.new;
+    const msg = payload.new;  
     console.log("New message received:", msg);
 
     // Ignore messages sent by the current user
@@ -475,7 +418,7 @@ export const NotificationProvider = ({ children }) => {
     // Load the last read timestamps
     const readMap = loadReadMap(user.email);
 
-    //  GLOBAL CHAT MESSAGES
+    //  GLOBAL CHAT MESSAGES 
     if (msg.type === 'group' && msg.recipient === 'group') {
       console.log("Global chat message received");
 
@@ -497,7 +440,7 @@ export const NotificationProvider = ({ children }) => {
       return;
     }
 
-    // DIRECT MESSAGES
+    // DIRECT MESSAGES 
     if (msg.type === 'dm') {
       console.log("Direct message received");
 
@@ -518,12 +461,8 @@ export const NotificationProvider = ({ children }) => {
           if (lastRead < Date.parse(msg.created_at)) {
             console.log(`Setting unread message from ${sender} (not in friends list yet)`);
 
-            // Use the debounced update function with the current state from ref
-            const newUnreadFriends = {
-              ...unreadFriendsRef.current,
-              [sender]: true
-            };
-            debouncedSetUnreadFriends(newUnreadFriends);
+            // Create a new object to ensure React re-renders
+            setUnreadFriends(prev => ({ ...prev, [sender]: true }));
           }
           // Skip further processing until we have updated friend data
           return;
@@ -534,12 +473,8 @@ export const NotificationProvider = ({ children }) => {
         if (lastRead < Date.parse(msg.created_at)) {
           console.log(`Setting unread message from ${sender}`);
 
-          // Use the debounced update function with the current state from ref
-          const newUnreadFriends = {
-            ...unreadFriendsRef.current,
-            [sender]: true
-          };
-          debouncedSetUnreadFriends(newUnreadFriends);
+          // Create a new object to ensure React re-renders
+          setUnreadFriends(prev => ({ ...prev, [sender]: true }));
 
           // Find the friend's display name if available
           const friend = friendsList.find(f => f.email === sender);
@@ -561,7 +496,7 @@ export const NotificationProvider = ({ children }) => {
       return;
     }
 
-    // GROUP CHAT MESSAGES
+    // GROUP CHAT MESSAGES 
     if (msg.type === 'groupchat' && msg.recipient && msg.recipient.startsWith('group:')) {
       console.log("Group chat message received");
 
@@ -584,12 +519,8 @@ export const NotificationProvider = ({ children }) => {
       if (lastRead < Date.parse(msg.created_at)) {
         console.log(`Setting unread message for group ${groupId}`);
 
-        // Use the debounced update function with the current state from ref
-        const newUnreadGroups = {
-          ...unreadGroupsRef.current,
-          [groupId]: true
-        };
-        debouncedSetUnreadGroups(newUnreadGroups);
+        // Create a new object to ensure React re-renders
+        setUnreadGroups(prev => ({ ...prev, [groupId]: true }));
 
         // Find the group name if available
         const group = groupsList.find(g => g.id === groupId);
@@ -738,9 +669,9 @@ export const NotificationProvider = ({ children }) => {
    * Marks a chat as read by updating the last read timestamp
    * Called when a user views a chat to clear notification indicators
    *- The type of chat ('global', 'friend', or 'group')
-   * @param {string} type
+   * @param {string} type 
    * - The ID of the chat (email for friend, group ID for group, null for global)
-   * @param {string|null} id
+   * @param {string|null} id 
    */
   const markAsRead = (type, id = null) => {
     if (!user) return;
@@ -764,28 +695,24 @@ export const NotificationProvider = ({ children }) => {
       if (!readMap.friends) readMap.friends = {};
       // Update friend chat timestamp
       readMap.friends[id] = currentTime;
-
-      // Create a new unread friends object without this friend
-      const newUnreadFriends = { ...unreadFriendsRef.current };
-      delete newUnreadFriends[id];
-
-      // Use the debounced update to prevent flickering
-      debouncedSetUnreadFriends(newUnreadFriends);
-
+      // Remove this friend from the unread state
+      setUnreadFriends(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
       console.log(`Updated friend ${id} lastRead timestamp to ${new Date(currentTime).toISOString()}`);
     } else if (type === 'group' && id) {
       // Ensure the groups object exists
       if (!readMap.groups) readMap.groups = {};
       // Update group chat timestamp
       readMap.groups[id] = currentTime;
-
-      // Create a new unread groups object without this group
-      const newUnreadGroups = { ...unreadGroupsRef.current };
-      delete newUnreadGroups[id];
-
-      // Use the debounced update to prevent flickering
-      debouncedSetUnreadGroups(newUnreadGroups);
-
+      // Remove this group from the unread state
+      setUnreadGroups(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
       console.log(`Updated group ${id} lastRead timestamp to ${new Date(currentTime).toISOString()}`);
     }
 
@@ -833,9 +760,9 @@ export const NotificationProvider = ({ children }) => {
  * Custom hook to access the notification context from any component
  * This hook must be used within a component that is a child of NotificationProvider
  *The notification context value
- * @returns {Object}
+ * @returns {Object} 
  * If used outside of a NotificationProvider
- * @throws {Error}
+ * @throws {Error} 
  */
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
