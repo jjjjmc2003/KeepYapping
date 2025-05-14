@@ -1,6 +1,6 @@
 // ChatApp.test.js
 describe('ChatApp Component Tests', () => {
-  // Test 1: Message Input Validation
+  // Test: Message Input Validation
   // Verifies that the text input field correctly captures user input
   test('allows users to input messages', () => {
     const messageText = "Hello, world!";
@@ -9,7 +9,7 @@ describe('ChatApp Component Tests', () => {
     expect(inputValue).toBe(messageText);
   });
 
-  // Test 2: Message Sending Functionality
+  // Test: Message Sending Functionality
   // Check if message is sent after clicking send button
   test('sends messages when send button is clicked', () => {
     const messageWasSent = true;
@@ -18,7 +18,7 @@ describe('ChatApp Component Tests', () => {
     expect(messageWasSent).toBe(true);
   });
 
-  // Test 3: Message Display
+  // Test: Message Display
   // Checks if messages appear in the chat window
   test('displays messages in the chat window', () => {
     const messagesVisible = true;
@@ -27,7 +27,7 @@ describe('ChatApp Component Tests', () => {
     expect(messagesVisible).toBe(true);
   });
 
-  // Test 4: Friend Selection
+  // Test: Friend Selection
   // Checks if users can select friends to chat with
   test('allows selecting a friend to chat with', () => {
     const friendSelected = "test@example.com";
@@ -37,7 +37,7 @@ describe('ChatApp Component Tests', () => {
     expect(friendSelected).toBe(expectedFriend);
   });
 
-  // Test 5: Group Chat
+  // Test: Group Chat
   // Tests basic group chat functionality
   test('supports group chat messaging', () => {
     const groupChatActive = true;
