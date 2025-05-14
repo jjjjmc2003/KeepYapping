@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState,useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/HomePage.css";
@@ -57,7 +57,10 @@ function HomePage({ onLogout }) {
   // Local notification state (in addition to context)
   // We use both for redundancy and to ensure notifications work correctly
   const [localUnreadFriendMessages, setLocalUnreadFriendMessages] = useState({}); 
-  const [localUnreadGroupMessages, setLocalUnreadGroupMessages] = useState({});   
+  const [localUnreadGroupMessages, setLocalUnreadGroupMessages] = useState({}); 
+  
+  const notificationCheckTimeoutRef = useRef(null);
+
 
   // This effect runs when the component mounts to load the user's data
   useEffect(() => {
@@ -94,6 +97,42 @@ function HomePage({ onLogout }) {
     // Call the function to load the user data
     fetchUserData();
   }, [navigate]); // Re-run if navigate changes (unlikely)
+
+useEffect(() => {
+  if (!userEmail) return;
+  
+  // For friend notifications
+  if (unreadFriendMessages && Object.keys(unreadFriendMessages).length > 0) {
+    setLocalUnreadFriendMessages(prev => {
+      const newState = { ...prev };
+      
+      // Add any notifications from context that aren't in local state
+      Object.keys(unreadFriendMessages).forEach(friend => {
+        if (unreadFriendMessages[friend] && !prev[friend]) {
+          newState[friend] = true;
+        }
+      });
+      
+      // If nothing changed, return the same reference to avoid re-renders
+      return Object.keys(newState).length !== Object.keys(prev).length ? newState : prev;
+    });
+  }
+  
+  // For group notifications - same pattern
+  if (unreadGroupMessages && Object.keys(unreadGroupMessages).length > 0) {
+    setLocalUnreadGroupMessages(prev => {
+      const newState = { ...prev };
+      
+      Object.keys(unreadGroupMessages).forEach(groupId => {
+        if (unreadGroupMessages[groupId] && !prev[groupId]) {
+          newState[groupId] = true;
+        }
+      });
+      
+      return Object.keys(newState).length !== Object.keys(prev).length ? newState : prev;
+    });
+  }
+}, [userEmail, unreadFriendMessages, unreadGroupMessages]);
 
   // Helper function to get the timestamps of when the user last read each chat
   // We use these timestamps to determine which chats have unread messages
@@ -833,6 +872,9 @@ function HomePage({ onLogout }) {
   const checkForNewFriendMessages = async (lastReadTimestamps) => {
   if (!userEmail || !lastReadTimestamps) return;
 
+  // Collect all updates first, then apply them in one batch
+  const updatedFriends = new Set();
+
   try {
     for (const friendEmail of Object.keys(lastReadTimestamps)) {
       const lastReadTime = lastReadTimestamps[friendEmail] || 0;
@@ -859,16 +901,26 @@ function HomePage({ onLogout }) {
 
       if (data && data.length > 0) {
         console.log(`DEBUG: Found unread messages from ${friendEmail}`);
-        
-        // Only update state if this friend doesn't already have unread messages
-        setLocalUnreadFriendMessages(prev => {
-          // If already marked unread, don't update state at all
-          if (prev[friendEmail] === true) {
-            return prev; // Keep the SAME object reference
-          }
-          return { ...prev, [friendEmail]: true };
-        });
+        updatedFriends.add(friendEmail);
       }
+    }
+
+    // Only update state once, with all changes
+    if (updatedFriends.size > 0) {
+      setLocalUnreadFriendMessages(prev => {
+        // Don't create a new object if nothing changes
+        let hasChanges = false;
+        const newState = { ...prev };
+        
+        updatedFriends.forEach(friend => {
+          if (!prev[friend]) {
+            newState[friend] = true;
+            hasChanges = true;
+          }
+        });
+        
+        return hasChanges ? newState : prev;
+      });
     }
   } catch (error) {
     console.error("DEBUG: Error checking for new friend messages:", error);
@@ -876,8 +928,11 @@ function HomePage({ onLogout }) {
 };
 
   // Function to check for new group messages
- const checkForNewGroupMessages = async (lastReadTimestamps) => {
+  const checkForNewGroupMessages = async (lastReadTimestamps) => {
   if (!userEmail || !lastReadTimestamps) return;
+
+  // Collect all updates first, then apply them in one batch
+  const updatedGroups = new Set();
 
   try {
     for (const groupId of Object.keys(lastReadTimestamps)) {
@@ -904,22 +959,31 @@ function HomePage({ onLogout }) {
 
       if (data && data.length > 0) {
         console.log(`DEBUG: Found unread messages in group ${groupId}`);
-        
-        // Only update state if this group doesn't already have unread messages
-        setLocalUnreadGroupMessages(prev => {
-          // If already marked unread, don't update state at all
-          if (prev[groupId] === true) {
-            return prev; // Keep the SAME object reference
-          }
-          return { ...prev, [groupId]: true };
-        });
+        updatedGroups.add(groupId);
       }
+    }
+    
+    // Only update state once, with all changes
+    if (updatedGroups.size > 0) {
+      setLocalUnreadGroupMessages(prev => {
+        // Don't create a new object if nothing changes
+        let hasChanges = false;
+        const newState = { ...prev };
+        
+        updatedGroups.forEach(groupId => {
+          if (!prev[groupId]) {
+            newState[groupId] = true;
+            hasChanges = true;
+          }
+        });
+        
+        return hasChanges ? newState : prev;
+      });
     }
   } catch (error) {
     console.error("DEBUG: Error checking for new group messages:", error);
   }
 };
-
   // Function to refresh pending friend requests
   const refreshPendingRequests = async () => {
     try {
@@ -945,7 +1009,33 @@ function HomePage({ onLogout }) {
     }
   };
 
-
+  const refreshInterval = setInterval(async () => {
+  console.log("Periodic refresh of friends, group chats, and pending requests");
+  await refreshFriendsList();
+  await initializeGroupChats();
+  await refreshPendingRequests();
+  
+  // Clear any existing timeout
+  if (notificationCheckTimeoutRef.current) {
+    clearTimeout(notificationCheckTimeoutRef.current);
+  }
+  
+  // Debounce notification checks to avoid flickering
+  notificationCheckTimeoutRef.current = setTimeout(() => {
+    try {
+      // Get the timestamps of when the user last read each chat
+      const lastReadTimestamps = loadLastReadTimestamps();
+      
+      // Check for unread messages with debouncing
+      checkForNewFriendMessages(lastReadTimestamps.friends || {});
+      checkForNewGroupMessages(lastReadTimestamps.groups || {});
+      
+      notificationCheckTimeoutRef.current = null;
+    } catch (error) {
+      console.error("Error in debounced notification check:", error);
+    }
+  }, 300);
+}, 5000);
 
   // Render content based on active section
   const renderContent = () => {
@@ -1191,117 +1281,42 @@ function HomePage({ onLogout }) {
           />
         </div>
 
-        <div className="friends-list" style={{ overflowY: "auto", maxHeight: "45%" }}>
-          <div className="friends-header">
-            <div className="friends-title">
+        <div className="friends-title">
               Friends — {friends.length}
-              {((unreadFriendMessages && Object.keys(unreadFriendMessages).length > 0) ||
-                (localUnreadFriendMessages && Object.keys(localUnreadFriendMessages).length > 0)) && (
-                <span style={{ color: '#ff5555', fontWeight: 'bold', marginLeft: '5px' }}>
-                  (New: {Math.max(
-                    Object.keys(unreadFriendMessages || {}).length,
-                    Object.keys(localUnreadFriendMessages || {}).length
-                  )})
-                </span>
-              )}
+              {/* Unread friend messages counter */}
+              {(() => {
+                // Merge both notification sources
+                const allUnreadFriends = new Set([
+                  ...Object.keys(unreadFriendMessages || {}).filter(k => unreadFriendMessages[k]),
+                  ...Object.keys(localUnreadFriendMessages || {}).filter(k => localUnreadFriendMessages[k])
+                ]);
+                
+                return allUnreadFriends.size > 0 && (
+                  <span style={{ color: '#ff5555', fontWeight: 'bold', marginLeft: '5px' }}>
+                    (New: {allUnreadFriends.size})
+                  </span>
+                );
+              })()}
             </div>
-          </div>
-          {filteredFriends.map((friend) => (
-            <div key={friend} className="friend-item" onClick={() => {
-              setSelectedFriend(friend);
-              setSelectedGroupChat(null);
-              setActiveSection("chat");
-            }}>
-              <div className="friend-avatar">
-                {friendAvatarIds[friend] === CUSTOM_AVATAR_ID ? (
-                  // Get custom avatar URL from localStorage
-                  <img
-                    src={JSON.parse(localStorage.getItem('friendCustomAvatars') || '{}')[friend]}
-                    alt={friendDisplayNames[friend] || friend}
-                  />
-                ) : friendAvatarIds[friend] ? (
-                  <img
-                    src={avatars.find(a => a.id === friendAvatarIds[friend])?.url || avatars[0].url}
-                    alt={friendDisplayNames[friend] || friend}
-                  />
-                ) : (
-                  (friendDisplayNames[friend] || friend).charAt(0).toUpperCase()
-                )}
-              </div>
-              <div className="friend-info">
-                <div className="friend-name" title={friendDisplayNames[friend] || friend}>
-                  {friendDisplayNames[friend] || friend}
-                  {((unreadFriendMessages && unreadFriendMessages[friend]) ||
-                    (localUnreadFriendMessages && localUnreadFriendMessages[friend])) && (
-                    <span style={{ color: '#ff5555', fontWeight: 'bold', marginLeft: '5px' }}>
-                      (New)
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
 
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: 10, marginBottom: 10 }}></div>
-
-        <div className="friends-list" style={{ overflowY: "auto", maxHeight: "45%" }}>
-          <div className="friends-header">
-            <div className="friends-title">
-              Group Chats — {groupChats.length}
-              {((unreadGroupMessages && Object.keys(unreadGroupMessages).length > 0) ||
-                (localUnreadGroupMessages && Object.keys(localUnreadGroupMessages).length > 0)) && (
-                <span style={{ color: '#ff5555', fontWeight: 'bold', marginLeft: '5px' }}>
-                  (New: {Math.max(
-                    Object.keys(unreadGroupMessages || {}).length,
-                    Object.keys(localUnreadGroupMessages || {}).length
-                  )})
-                </span>
-              )}
-            </div>
-          </div>
-          {filteredGroupChats.map((chat) => (
-            <div key={chat.id} className="friend-item">
-              <div
-                className="friend-item-content"
-                onClick={() => {
-                  setSelectedFriend("");
-                  setSelectedGroupChat(chat);
-                  setShowGroupChatCreator(false);
-                  setActiveSection("chat");
-                }}
-              >
-                <div className="friend-avatar">
-                  {chat.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="friend-info">
-                  <div className="friend-name" title={chat.name}>
-                    {chat.name}
-                    {((unreadGroupMessages && unreadGroupMessages[chat.id]) ||
-                      (localUnreadGroupMessages && localUnreadGroupMessages[chat.id])) && (
-                      <span style={{ color: '#ff5555', fontWeight: 'bold', marginLeft: '5px' }}>
-                        (New)
-                      </span>
-                    )}
-                  </div>
-                  <div className="friend-status">Group</div>
-                </div>
-              </div>
-              {chat.creator === userEmail && (
-                <button
-                  className="delete-group-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteGroupChat(chat.id);
-                  }}
-                  title="Delete group chat"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+<div className="friends-title">
+  Group Chats — {groupChats.length}
+  {/* Unread group messages counter */}
+  {(() => {
+    // Merge both notification sources
+    const allUnreadGroups = new Set([
+      ...Object.keys(unreadGroupMessages || {}).filter(k => unreadGroupMessages[k]),
+      ...Object.keys(localUnreadGroupMessages || {}).filter(k => localUnreadGroupMessages[k])
+    ]);
+    
+    return allUnreadGroups.size > 0 && (
+      <span style={{ color: '#ff5555', fontWeight: 'bold', marginLeft: '5px' }}>
+        (New: {allUnreadGroups.size})
+      </span>
+    );
+  })()}
+</div>
       </div>
 
       <div className="main-content">
