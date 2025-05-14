@@ -1,33 +1,68 @@
+/**
+ * ProfileEditor.jsx
+ *
+ * This component provides a user profile management interface for the KeepYapping application.
+ * It allows users to view and edit their profile information including:
+ * - Full name
+ * - Display name with uniqueness validation
+ * - Bio
+ * - Avatar both predefined options and custom uploads
+ *
+ * The component handles both viewing and editing modes, with proper validation
+ * and error handling for all operations.
+ */
+
 import React, { useState, useEffect, useRef } from "react";
 import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/ProfileEditor.css";
+// Import avatar options and custom avatar ID constant
 import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
 
-// Supabase Setup
+// Supabase connection configuration
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
+// Initialize Supabase client for database operations
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/**
+ * ProfileEditor component for managing user profile information
+ * - The email of the current user
+ * @param {string} userEmail
+ * - Callback function to notify parent component when profile is updated
+ * @param {Function} onProfileUpdate
+ * The profile editor UI
+ * @returns {JSX.Element}
+ */
 function ProfileEditor({ userEmail, onProfileUpdate }) {
-  const [name, setName] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [bio, setBio] = useState("");
-  const [avatarId, setAvatarId] = useState(1); // Default avatar ID
+  // State variables for user profile data
+  const [name, setName] = useState("");                     // User's full name
+  const [displayName, setDisplayName] = useState("");       // User's display name shown in the app
+  const [bio, setBio] = useState("");                       // User's bio/about text
+  const [avatarId, setAvatarId] = useState(1);              // Selected avatar ID (1 is default)
   const [customAvatarUrl, setCustomAvatarUrl] = useState(""); // URL for custom uploaded avatar
-  const [isUploading, setIsUploading] = useState(false); // Track avatar upload status
-  const [originalDisplayName, setOriginalDisplayName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ text: "", type: "" });
-  const [isEditing, setIsEditing] = useState(false);
+
+  // State variables for UI and operation status
+  const [isUploading, setIsUploading] = useState(false);    // Track avatar upload status
+  const [originalDisplayName, setOriginalDisplayName] = useState(""); // For checking if display name changed
+  const [loading, setLoading] = useState(false);            // Track form submission status
+  const [message, setMessage] = useState({ text: "", type: "" }); // Feedback messages
+  const [isEditing, setIsEditing] = useState(false);        // Toggle between view/edit modes
+
+  // Reference to hidden file input for avatar upload
   const fileInputRef = useRef(null);
 
-  // Fetch user profile data
+  /**
+   * Effect hook to fetch user profile data when component mounts or userEmail changes
+   * Retrieves profile information from the database and populates the form fields
+   */
   useEffect(() => {
     async function fetchUserProfile() {
+      // Don't attempt to fetch if no email is provided
       if (!userEmail) return;
 
       try {
+        // Query the users table for the current user's profile data
         const { data, error } = await supabase
           .from("users")
           .select("*")
@@ -39,28 +74,35 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           return;
         }
 
+        // If user data exists, populate the form fields
         if (data) {
           setName(data.name || "");
           setDisplayName(data.displayname || "");
-          setOriginalDisplayName(data.displayname || "");
+          setOriginalDisplayName(data.displayname || ""); // Store original for comparison
           setBio(data.bio || "");
-          setAvatarId(data.avatar_id || 1); // Default to 1 if not set
-          setCustomAvatarUrl(data.custom_avatar_url || ""); // Get custom avatar URL if exists
+          setAvatarId(data.avatar_id || 1); // Default to first avatar if not set
+          setCustomAvatarUrl(data.custom_avatar_url || ""); // Set custom avatar URL if exists
         }
       } catch (err) {
         console.error("Unexpected error fetching user profile:", err);
       }
     }
 
+    // Call the function to fetch profile data
     fetchUserProfile();
-  }, [userEmail]);
+  }, [userEmail]); // Re-run when userEmail changes
 
-  // Handle custom avatar upload
+  /**
+   * Handles the custom avatar image upload process
+   * Validates the file, uploads it to Supabase storage, and updates the avatar selection
+   *
+   * @param {Event} event - The file input change event
+   */
   const handleAvatarUpload = async (event) => {
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file) return; // No file selected
 
-    // Validate file type
+    // Validate file type (must be an image)
     if (!file.type.startsWith("image/")) {
       setMessage({
         text: "Please select an image file.",
@@ -78,14 +120,15 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
       return;
     }
 
+    // Update UI to show upload in progress
     setIsUploading(true);
     setMessage({ text: "Uploading avatar...", type: "info" });
 
     try {
-      // Create a unique file name
+      // Create a unique file name to prevent collisions
       const fileExtension = file.name.split(".").pop();
       const fileName = `${Date.now()}.${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-      const filePath = `avatars/${userEmail}/${fileName}`;
+      const filePath = `avatars/${userEmail}/${fileName}`; // Organize by user email
 
       // Check if avatars bucket exists, if not create it
       const { data: buckets, error: listError } = await supabase.storage.listBuckets();
@@ -94,10 +137,10 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         throw new Error(`Failed to list buckets: ${listError.message}`);
       }
 
+      // Create the avatars bucket if it doesn't exist
       if (!buckets.find(bucket => bucket.name === "avatars")) {
-        // Create the avatars bucket if it doesn't exist
         const { error: createError } = await supabase.storage.createBucket("avatars", {
-          public: true
+          public: true // Make bucket publicly accessible for avatar images
         });
 
         if (createError) {
@@ -109,8 +152,8 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
+          cacheControl: '3600', // Cache control for 1 hour
+          upsert: true // Overwrite if file exists
         });
 
       if (uploadError) {
@@ -122,9 +165,9 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         .from("avatars")
         .getPublicUrl(filePath);
 
-      // Set the custom avatar URL and select the custom avatar option
+      // Update state with the new avatar information
       setCustomAvatarUrl(publicUrl);
-      setAvatarId(CUSTOM_AVATAR_ID);
+      setAvatarId(CUSTOM_AVATAR_ID); // Switch to custom avatar mode
       setMessage({ text: "Avatar uploaded successfully!", type: "success" });
     } catch (error) {
       console.error("Error uploading avatar:", error);
@@ -133,18 +176,23 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         type: "error"
       });
     } finally {
-      setIsUploading(false);
+      setIsUploading(false); // Reset uploading state
     }
   };
 
-  // Handle form submission
+  /**
+   * Handles the profile update form submission
+   * Validates inputs, checks for display name uniqueness, and updates the user profile in the database
+   *
+   * @param {Event} e - The form submission event
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMessage({ text: "", type: "" });
+    setMessage({ text: "", type: "" }); // Clear previous messages
 
     try {
-      // Check if user is authenticated
+      // Step 1: Verify user authentication
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (!sessionData.session) {
@@ -156,13 +204,14 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         return;
       }
 
-      // Check if user exists in the users table
+      // Step 2: Check if user exists in the users table
       const { error: userCheckError } = await supabase
         .from("users")
         .select("*")
         .eq("email", userEmail)
         .single();
 
+      // Handle database query errors (ignore "not found" errors)
       if (userCheckError && userCheckError.code !== "PGRST116") {
         console.error("Error checking if user exists:", userCheckError);
         setMessage({
@@ -175,7 +224,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
 
       const userExists = !userCheckError;
 
-      // Validate display name uniqueness if it has changed
+      // Step 3: Validate display name uniqueness if it has changed
       if (displayName !== originalDisplayName) {
         const { data: existingDisplayName, error: displayNameError } = await supabase
           .from("users")
@@ -183,6 +232,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           .eq("displayname", displayName)
           .single();
 
+        // If display name exists and belongs to another user
         if (existingDisplayName && existingDisplayName.email !== userEmail) {
           setMessage({
             text: "This display name is already taken. Please choose another one.",
@@ -192,6 +242,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           return;
         }
 
+        // Handle database query errors (ignore "not found" errors)
         if (displayNameError && displayNameError.code !== "PGRST116") {
           console.error("Error checking display name:", displayNameError);
           setMessage({
@@ -203,7 +254,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         }
       }
 
-      // Prepare the user data
+      // Step 4: Prepare the user data for database operation
       const userData = {
         email: userEmail,
         name,
@@ -215,14 +266,14 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
 
       let updateResult;
 
-      // Insert or update based on whether user exists
+      // Step 5: Insert or update based on whether user exists
       if (!userExists) {
-        // Insert new user
+        // Insert new user record
         updateResult = await supabase
           .from("users")
           .insert([userData]);
       } else {
-        // Update existing user
+        // Update existing user record
         updateResult = await supabase
           .from("users")
           .update({
@@ -247,10 +298,10 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         return;
       }
 
-      // If display name has changed, check if friend_requests table has display name columns
+      // Step 6: Update display name in friend_requests table if it changed
       if (displayName !== originalDisplayName) {
         try {
-          // Check if the friend_requests table has the expected columns
+          // Check if the friend_requests table has the display name columns
           const { data: tableInfo } = await supabase
             .from("friend_requests")
             .select("*")
@@ -259,13 +310,13 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           // Get the column names from the first row if available
           const columnNames = tableInfo && tableInfo.length > 0 ? Object.keys(tableInfo[0]) : [];
 
-          // Check if the sender_display_name column exists
+          // Check if the display name columns exist
           const hasSenderDisplayName = columnNames.includes("sender_display_name");
           const hasReceiverDisplayName = columnNames.includes("receiver_display_name");
 
           // Only update if the columns exist
           if (hasSenderDisplayName) {
-            // Update sender_email entries
+            // Update sender display name where this user is the sender
             await supabase
               .from("friend_requests")
               .update({ sender_display_name: displayName })
@@ -273,7 +324,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           }
 
           if (hasReceiverDisplayName) {
-            // Update receiver_email entries
+            // Update receiver display name where this user is the receiver
             await supabase
               .from("friend_requests")
               .update({ receiver_display_name: displayName })
@@ -285,15 +336,18 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         }
       }
 
+      // Step 7: Show success message and update state
       setMessage({
         text: "Profile updated successfully!",
         type: "success"
       });
 
+      // Update the original display name to the new one
       setOriginalDisplayName(displayName);
+      // Exit editing mode
       setIsEditing(false);
 
-      // Notify parent component about the update
+      // Step 8: Notify parent component about the update
       if (onProfileUpdate) {
         onProfileUpdate({
           name,
@@ -310,14 +364,20 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         type: "error"
       });
     } finally {
-      setLoading(false);
+      setLoading(false); // Reset loading state
     }
   };
 
+  /**
+   * Render the profile editor component
+   * Shows either the view mode or edit mode based on isEditing state
+   */
   return (
     <div className="profile-editor">
+      {/* Header section with title and edit button */}
       <div className="profile-editor-header">
         <h2>Your Profile</h2>
+        {/* Only show Edit button when not in editing mode */}
         {!isEditing && (
           <button
             className="btn btn-primary edit-profile-btn"
@@ -328,14 +388,18 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
         )}
       </div>
 
+      {/* Message display for success/error feedback */}
       {message.text && (
         <div className={`message ${message.type}`}>
           {message.text}
         </div>
       )}
 
+      {/* Conditional rendering based on editing mode */}
       {isEditing ? (
+        // Edit mode - form for updating profile information
         <form onSubmit={handleSubmit}>
+          {/* Full Name field */}
           <div className="form-group">
             <label htmlFor="name">Full Name</label>
             <input
@@ -348,6 +412,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             />
           </div>
 
+          {/* Display Name field - must be unique */}
           <div className="form-group">
             <label htmlFor="displayName">Display Name</label>
             <input
@@ -360,6 +425,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             />
           </div>
 
+          {/* Bio field */}
           <div className="form-group">
             <label htmlFor="bio">Bio</label>
             <textarea
@@ -371,29 +437,32 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             />
           </div>
 
+          {/* Avatar selection section */}
           <div className="form-group">
             <label>Avatar</label>
+            {/* Hidden file input for custom avatar upload */}
             <div className="avatar-upload-container">
               <input
                 type="file"
                 id="avatar-upload"
-                accept="image/*"
+                accept="image/*" // Only allow image files
                 onChange={handleAvatarUpload}
                 ref={fileInputRef}
-                style={{ display: "none" }}
+                style={{ display: "none" }} // Hidden but accessible via button
               />
               <button
                 type="button"
                 className="btn btn-secondary upload-avatar-btn"
-                onClick={() => fileInputRef.current.click()}
+                onClick={() => fileInputRef.current.click()} // Trigger file input click
                 disabled={isUploading}
               >
                 {isUploading ? "Uploading..." : "Upload Custom Avatar"}
               </button>
             </div>
 
+            {/* Avatar selection grid */}
             <div className="avatar-selection">
-              {/* Custom avatar preview */}
+              {/* Custom avatar preview - only shown if uploaded */}
               {avatarId === CUSTOM_AVATAR_ID && customAvatarUrl && (
                 <div
                   className={`avatar-option selected custom-avatar`}
@@ -403,7 +472,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
                 </div>
               )}
 
-              {/* Predefined avatars */}
+              {/* Predefined avatars from the avatars array */}
               {avatars.filter(avatar => avatar.id !== CUSTOM_AVATAR_ID).map((avatar) => (
                 <div
                   key={avatar.id}
@@ -416,7 +485,9 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             </div>
           </div>
 
+          {/* Form action buttons */}
           <div className="form-actions">
+            {/* Cancel button - resets form to original values */}
             <button
               type="button"
               className="btn btn-secondary"
@@ -431,6 +502,7 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
             >
               Cancel
             </button>
+            {/* Submit button - saves changes */}
             <button
               type="submit"
               className="btn btn-primary"
@@ -441,14 +513,18 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
           </div>
         </form>
       ) : (
+        // View mode - display current profile information
         <div className="profile-display">
+          {/* Avatar display */}
           <div className="profile-field">
             <div className="field-label">Avatar:</div>
             <div className="field-value">
               <div className="current-avatar">
+                {/* Show custom avatar if selected and available */}
                 {avatarId === CUSTOM_AVATAR_ID && customAvatarUrl ? (
                   <img src={customAvatarUrl} alt="Your custom avatar" />
                 ) : (
+                  // Otherwise show selected predefined avatar or default
                   <img
                     src={avatars.find(a => a.id === avatarId)?.url || avatars[0].url}
                     alt="Your avatar"
@@ -457,18 +533,22 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
               </div>
             </div>
           </div>
+          {/* Email field - not editable */}
           <div className="profile-field">
             <div className="field-label">Email:</div>
             <div className="field-value">{userEmail}</div>
           </div>
+          {/* Full Name field */}
           <div className="profile-field">
             <div className="field-label">Full Name:</div>
             <div className="field-value">{name || "Not set"}</div>
           </div>
+          {/* Display Name field */}
           <div className="profile-field">
             <div className="field-label">Display Name:</div>
             <div className="field-value">{displayName || "Not set"}</div>
           </div>
+          {/* Bio field */}
           <div className="profile-field">
             <div className="field-label">Bio:</div>
             <div className="field-value bio-text">{bio || "Not set"}</div>
@@ -479,4 +559,5 @@ function ProfileEditor({ userEmail, onProfileUpdate }) {
   );
 }
 
+// Export the component for use in other parts of the application
 export default ProfileEditor;
