@@ -4,56 +4,82 @@ import * as SupabaseClient from "@supabase/supabase-js";
 import "../styles/Auth.css";
 import backgroundImage from "./Images/KeepYappingLogo.png";
 
+// Supabase connection configuration
+// These are the credentials for connecting to our Supabase backend
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
+// Initialize the Supabase client for authentication and database operations
+// This client will be used throughout the component for auth operations
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/**
+ * ResetPassword component handles the password reset functionality
+ * It allows users to set a new password after receiving a password reset link via email
+ * The component processes URL tokens from Supabase's password reset flow
+ * and provides a form for users to enter and confirm their new password
+ */
 function ResetPassword() {
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  // State variables for form inputs and UI control
+  // Stores the new password input
+  const [password, setPassword] = useState(""); 
+  // Stores the confirmation password for validation
+  const [confirmPassword, setConfirmPassword] = useState(""); 
+  // Holds error messages to display to the user
+  const [error, setError] = useState(""); 
+  // Holds success messages to display to the user
+  const [message, setMessage] = useState(""); 
+  // Tracks when form submission is in progress
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
+  // Controls password field visibility toggle 
+  const [showPassword, setShowPassword] = useState(false); 
+  // Controls confirm password field visibility toggle
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); 
+  // Hook for programmatic navigation between routes
   const navigate = useNavigate();
 
-  // Check if we have a valid hash in the URL
+  /**
+   * Check if we have a valid hash in the URL when component mounts
+   * This is needed for password reset flow where Supabase sends a URL with tokens
+   * The function extracts authentication tokens from the URL and establishes a session
+   */
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Get the hash from the URL
+        // Get the hash fragment from the URL contains the auth tokens
         const hash = window.location.hash;
         console.log("Reset password hash:", hash);
 
-        // Log the raw hash content for debugging
+        // Log the raw hash content for debugging purposes
         if (hash) {
           let hashContent = hash.substring(1);
           console.log("Raw hash content:", hashContent);
 
+          // Handle special case where hash contains another hash symbol
+          // Supabase sometimes adds prefixes like #for-password-reset# before the actual tokens
           if (hashContent.includes('#')) {
             console.log("Contains special prefix, extracting actual parameters");
             console.log("After prefix removal:", hashContent.split('#')[1]);
           }
         }
 
-        // If there's a hash, try to extract the access token
+        // If there's a hash with access token, process it to set up the session
         if (hash && (hash.includes('access_token=') || hash.includes('#access_token='))) {
-          // The hash contains the access token and refresh token
-          // We need to manually set the session using the hash parameters
+          // The hash contains the access token and refresh token from Supabase
+          // We need to manually set the session using these parameters
           console.log("Found access token in URL, setting session");
 
-          // Extract the hash without the # character and handle special prefix
+          // Extract the hash content without the leading # character
           let hashContent = hash.substring(1);
 
-          // Check if there's a special prefix like #for-password-reset#
+          // Handle special case where Supabase adds a prefix like #for-password-reset#
           if (hashContent.includes('#')) {
-            // Split at the second # to get the actual parameters
+            // Split at the second # to get the actual auth parameters
             hashContent = hashContent.split('#')[1];
           }
 
+          // Parse the URL parameters into an object
+          // This converts the URL hash string into a usable JavaScript object
           const hashParams = hashContent.split('&').reduce((params, param) => {
             const [key, value] = param.split('=');
             params[key] = value;
@@ -62,8 +88,10 @@ function ResetPassword() {
 
           console.log("Hash parameters:", hashParams);
 
+          // If we have an access token, set up the session with Supabase
           if (hashParams.access_token) {
-            // Set the session manually
+            // Set the session manually using the extracted tokens
+            // This establishes an authenticated session with Supabase
             const { error } = await supabase.auth.setSession({
               access_token: hashParams.access_token,
               refresh_token: hashParams.refresh_token || ''
@@ -84,15 +112,25 @@ function ResetPassword() {
       }
     };
 
+    // Run the session check when component mounts
     checkSession();
   }, []);
 
+  /**
+   * Handle the password update form submission
+   * Validates passwords, checks for valid session, and updates the user's password
+   * This function is called when the user submits the password reset form
+   * - The form submission event
+   * @param {Event} e 
+   */
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
+    // Reset any previous messages to provide a clean slate for new feedback
     setError("");
     setMessage("");
     setLoading(true);
 
+    // Validate password inputs before proceeding with the update
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setLoading(false);
@@ -108,15 +146,17 @@ function ResetPassword() {
     try {
       console.log("Attempting to update password");
 
-      // Get the current session to check if we're in a recovery flow
+      // Check if we already have a valid session from the useEffect
+      // This verifies if the user is authenticated before allowing password change
       const { data: sessionData } = await supabase.auth.getSession();
       console.log("Current session:", sessionData);
 
-      // Check if we have a valid session
+      // If no session exists, try to extract tokens from URL again
+      // This is a fallback in case the initial session setup in useEffect failed
       if (!sessionData.session) {
         console.log("No session found, trying to extract token from URL");
 
-        // Get the hash from the URL
+        // Get the hash from the URL which contains authentication tokens
         const hash = window.location.hash;
 
         if (hash && (hash.includes('access_token=') || hash.includes('#access_token='))) {
@@ -124,11 +164,14 @@ function ResetPassword() {
           let hashContent = hash.substring(1);
 
           // Check if there's a special prefix like #for-password-reset#
+          // Supabase sometimes adds these prefixes to the URL
           if (hashContent.includes('#')) {
             // Split at the second # to get the actual parameters
             hashContent = hashContent.split('#')[1];
           }
 
+          // Parse URL parameters, using decodeURIComponent to handle special characters
+          // This converts encoded URL characters back to their original form
           const hashParams = hashContent.split('&').reduce((params, param) => {
             const [key, value] = param.split('=');
             params[key] = decodeURIComponent(value);
@@ -137,8 +180,9 @@ function ResetPassword() {
 
           console.log("Hash parameters:", hashParams);
 
+          // Try to establish a session with the extracted tokens
           if (hashParams.access_token) {
-            // Set the session manually
+            // Set the session manually with Supabase using the extracted tokens
             const { error: sessionError } = await supabase.auth.setSession({
               access_token: hashParams.access_token,
               refresh_token: hashParams.refresh_token || ''
@@ -164,7 +208,8 @@ function ResetPassword() {
         }
       }
 
-      // Update the user's password
+      // Now that we have a valid session, update the user's password
+      // This uses Supabase's updateUser method to change the password
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
       });
@@ -174,12 +219,15 @@ function ResetPassword() {
       if (updateError) {
         setError(`Error updating password: ${updateError.message}`);
       } else {
+        // Show success message to confirm the password was updated
         setMessage("Your password has been updated successfully!");
 
-        // Sign out the user to ensure a clean state
+        // Sign out the user to ensure a clean state after password reset
+        // This forces the user to log in with their new password
         await supabase.auth.signOut();
 
-        // Redirect to login page after 3 seconds
+        // Redirect to login page after a short delay
+        // This gives the user time to read the success message
         setTimeout(() => {
           navigate("/login");
         }, 3000);
@@ -188,10 +236,12 @@ function ResetPassword() {
       console.error("Error in password update:", err);
       setError(`Unexpected error: ${err.message}`);
     } finally {
+      // Always reset loading state regardless of success or failure
       setLoading(false);
     }
   };
 
+  // Render the password reset form UI
   return (
     <div
       className="auth-container"
@@ -208,6 +258,7 @@ function ResetPassword() {
         backgroundPosition: "center",
       }}
     >
+      {/* Main card container for the password reset form */}
       <div
         className="auth-card"
         style={{
@@ -223,6 +274,7 @@ function ResetPassword() {
           zIndex: 1,
         }}
       >
+        {/* Header section with title and description */}
         <div className="auth-header" style={{ textAlign: "center", marginBottom: "1rem" }}>
           <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#fff" }}>Set New Password</h2>
           <p style={{ color: "#ccc", fontSize: "0.95rem" }}>
@@ -230,7 +282,9 @@ function ResetPassword() {
           </p>
         </div>
 
+        {/* Password reset form with validation and submission handling */}
         <form className="auth-form" onSubmit={handlePasswordUpdate}>
+            {/* Error message display - only shown when there's an error */}
             {error && (
               <div
                 className="error-message"
@@ -247,6 +301,7 @@ function ResetPassword() {
               </div>
             )}
 
+            {/* Success message display - only shown after successful password update */}
             {message && (
               <div
                 className="success-message"
@@ -263,6 +318,7 @@ function ResetPassword() {
               </div>
             )}
 
+            {/* New password input field with visibility toggle */}
             <div className="form-group" style={{ marginBottom: "1rem" }}>
               <label htmlFor="password" style={{ color: "#bbb", fontSize: "0.9rem", fontWeight: "500" }}>
                 New Password
@@ -287,6 +343,7 @@ function ResetPassword() {
                     paddingRight: "2.5rem" // Make room for the eye icon
                   }}
                 />
+                {/* Password visibility toggle button */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -298,8 +355,10 @@ function ResetPassword() {
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    color: "#5865f2", // KeepYapping blue color
-                    fontSize: "1.5rem", // Increased size
+                    // KeepYapping blue color
+                    color: "#5865f2", 
+                    // Increased size
+                    fontSize: "1.5rem", 
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -307,6 +366,7 @@ function ResetPassword() {
                   }}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
+                  {/* SVG icon for hidden/visible password state */}
                   {showPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" width="1.2em" height="1.2em" fill="currentColor">
                       <path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/>
@@ -320,6 +380,7 @@ function ResetPassword() {
               </div>
             </div>
 
+            {/* Confirm password input field with visibility toggle */}
             <div className="form-group" style={{ marginBottom: "1rem" }}>
               <label htmlFor="confirmPassword" style={{ color: "#bbb", fontSize: "0.9rem", fontWeight: "500" }}>
                 Confirm New Password
@@ -341,9 +402,11 @@ function ResetPassword() {
                     padding: "0.75rem",
                     fontSize: "1rem",
                     marginTop: "0.25rem",
-                    paddingRight: "2.5rem" // Make room for the eye icon
+                    // Make room for the eye icon
+                    paddingRight: "2.5rem" 
                   }}
                 />
+                {/* Confirm password visibility toggle button */}
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -355,8 +418,10 @@ function ResetPassword() {
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    color: "#5865f2", // KeepYapping blue color
-                    fontSize: "1.5rem", // Increased size
+                     // KeepYapping blue color
+                    color: "#5865f2",
+                     // Increased size
+                    fontSize: "1.5rem",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -364,6 +429,7 @@ function ResetPassword() {
                   }}
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
+                  {/* SVG icon for hidden/visible confirm password state */}
                   {showConfirmPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" width="1.2em" height="1.2em" fill="currentColor">
                       <path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/>
@@ -377,6 +443,7 @@ function ResetPassword() {
               </div>
             </div>
 
+            {/* Submit button for the password update form */}
             <button
               className="auth-button"
               type="submit"
@@ -400,6 +467,7 @@ function ResetPassword() {
             </button>
           </form>
 
+        {/* Footer with link back to login page */}
         <div className="auth-footer" style={{ textAlign: "center", marginTop: "1rem", fontSize: "0.9rem" }}>
           <p style={{ color: "#aaa" }}>
             Remember your password?{" "}
@@ -410,7 +478,7 @@ function ResetPassword() {
         </div>
       </div>
 
-      {/* Animation keyframes */}
+      {/* Animation keyframes for fade-in effect when component loads */}
       <style>
         {`
           @keyframes fadeIn {
@@ -423,4 +491,5 @@ function ResetPassword() {
   );
 }
 
+// Export the component for use in other parts of the application
 export default ResetPassword;
