@@ -844,11 +844,11 @@ function HomePage({ onLogout }) {
     if (!userEmail || !lastReadTimestamps) return;
 
     try {
+       const newUnreadFriendMessages = { ...localUnreadFriendMessages };
+        let hasUpdates = false;
       // For each friend, check if there are any unread messages
       for (const friendEmail of Object.keys(lastReadTimestamps)) {
-        const newUnreadFriendMessages = { ...localUnreadFriendMessages };
-        const lastReadTime = lastReadTimestamps[friendEmail] || 0;
-        let hasUpdates = false;
+       
 
         // Skip if we're currently viewing this friend's chat
         if (activeSection === "chat" && selectedFriend === friendEmail) {
@@ -897,11 +897,12 @@ function HomePage({ onLogout }) {
     if (!userEmail || !lastReadTimestamps) return;
 
     try {
+        const newUnreadGroupMessages = { ...localUnreadGroupMessages };
+        let hasUpdates = false;
       // For each group, check if there are any unread messages
       for (const groupId of Object.keys(lastReadTimestamps)) {
         const lastReadTime = lastReadTimestamps[groupId] || 0;
-        const newUnreadGroupMessages = { ...localUnreadGroupMessages };
-        let hasUpdates = false;
+     
 
         // Skip if we're currently viewing this group chat
         if (activeSection === "chat" && selectedGroupChat && selectedGroupChat.id === groupId) {
