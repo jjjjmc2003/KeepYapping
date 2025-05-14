@@ -866,8 +866,8 @@ function HomePage({ onLogout }) {
           console.log(`DEBUG: Found unread messages from ${friendEmail}`);
 
           // Update the local notification state
-          //const newUnreadFriendMessages = {...localUnreadFriendMessages};
-          //newUnreadFriendMessages[friendEmail] = true;
+          const newUnreadFriendMessages = {...localUnreadFriendMessages};
+          newUnreadFriendMessages[friendEmail] = true;
 
           // This is a direct state update, not using the context
           setLocalUnreadFriendMessages(prev => ({
@@ -918,8 +918,8 @@ function HomePage({ onLogout }) {
           console.log(`DEBUG: Found unread messages in group ${groupId}`);
 
           // Update the local notification state
-         // const newUnreadGroupMessages = {...localUnreadGroupMessages};
-          //newUnreadGroupMessages[groupId] = true;
+          const newUnreadGroupMessages = {...localUnreadGroupMessages};
+          newUnreadGroupMessages[groupId] = true;
 
           // This is a direct state update, not using the context
             setLocalUnreadGroupMessages(prev => ({
