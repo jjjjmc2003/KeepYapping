@@ -1,13 +1,9 @@
 // This file contains the component for creating new group chats
 // It allows users to name a group and add friends from a searchable dropdown
 
-// Import React and its hooks for building our component
 import React, { useState, useEffect } from "react";
-// Import Supabase client for database operations
 import * as SupabaseClient from "@supabase/supabase-js";
-// Import CSS styles for this component
 import "../styles/GroupChatCreator.css";
-// Import avatar images and the special ID for custom avatars
 import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
 
 // Connection details for our Supabase database
@@ -23,15 +19,15 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
   const [groupName, setGroupName] = useState("");
 
   // State for the friend search functionality
-  const [searchTerm, setSearchTerm] = useState("");          // What the user types in the search box
-  const [friends, setFriends] = useState([]);                // List of all the user's friends
-  const [filteredFriends, setFilteredFriends] = useState([]); // Friends filtered by search term
-  const [selectedFriends, setSelectedFriends] = useState([]); // Friends selected to add to the group
-  const [showDropdown, setShowDropdown] = useState(false);   // Whether to show the search dropdown
+  const [searchTerm, setSearchTerm] = useState("");          
+  const [friends, setFriends] = useState([]);               
+  const [filteredFriends, setFilteredFriends] = useState([]); 
+  const [selectedFriends, setSelectedFriends] = useState([]); 
+  const [showDropdown, setShowDropdown] = useState(false);   
 
   // State for error and success messages
-  const [error, setError] = useState("");                    // Error message to display
-  const [success, setSuccess] = useState("");                // Success message to display
+  const [error, setError] = useState("");                    
+  const [success, setSuccess] = useState("");                
 
   // This effect runs when the component mounts to load friends and set up real-time updates
   useEffect(() => {
@@ -100,7 +96,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
       };
     }
 
-    // If we don't have a user email, just clean up the interval
+    // If we don't have a user email
     return () => {
       clearInterval(refreshInterval);
     };
@@ -131,7 +127,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
     if (!currentUserEmail) return;
 
     try {
-      // Step 1: Get all accepted friend requests involving this user
+      // Get all accepted friend requests involving this user
       const { data: requestsData, error } = await supabase
         .from("friend_requests")
         .select("*")
@@ -145,13 +141,13 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         return;
       }
 
-      // Step 2: Extract the email addresses of all friends
-      // For each request, get the email of the other person (not the current user)
+      // Extract the email addresses of all friends
+      // For each request, get the email of the other person not the current user
       const friendEmails = requestsData.map((req) =>
         req.sender_email === currentUserEmail ? req.receiver_email : req.sender_email
       );
 
-      // Step 3: Get additional details for each friend (display name, avatar)
+      //Get additional details for each friend (display name, avatar)
       const { data: usersData, error: usersError } = await supabase
         .from("users")
         .select("email, displayname, avatar_id, custom_avatar_url")
@@ -164,7 +160,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         return;
       }
 
-      // Step 4: Create enhanced friend objects with all the details we need
+      // Create enhanced friend objects with all the details we need
       const enhancedFriends = friendEmails.map(email => {
         // Find this friend's details in the users data
         const user = usersData.find(u => u.email === email);
@@ -178,7 +174,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         };
       });
 
-      // Step 5: Store custom avatar URLs in localStorage for use across the app
+      // Store custom avatar URLs in localStorage for use across the app
       const customAvatarMap = {};
       // Find all users with custom avatars
       usersData.forEach(user => {
@@ -199,7 +195,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         console.error("Error updating friendCustomAvatars in localStorage:", error);
       }
 
-      // Step 6: Update state with the enhanced friends list
+      // Update state with the enhanced friends list
       setFriends(enhancedFriends);
       setError(""); // Clear any previous errors
     } catch (error) {
@@ -240,7 +236,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
 
   // Function to create a new group chat when the user clicks the Create button
   const handleCreateGroupChat = async () => {
-    // Step 1: Validate the inputs before proceeding
+    // Validate the inputs before proceeding
     // Make sure the group name isn't empty
     if (!groupName.trim()) {
       setError("Please enter a group chat name");
@@ -257,7 +253,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
       console.log("Creating group chat with name:", groupName);
       console.log("Selected friends:", selectedFriends);
 
-      // Step 2: Create the group chat in the database
+      // Create the group chat in the database
       const { data: groupChatData, error: groupChatError } = await supabase
         .from("group_chats")
         .insert([{
@@ -285,7 +281,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
       const newGroupChat = groupChatData[0];
       console.log("Created group chat:", newGroupChat);
 
-      // Step 3: Add all members to the group_chat_members table
+      //Add all members to the group_chat_members table
       const memberInserts = [
         // Add the creator as a member
         {
@@ -310,8 +306,8 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         // Don't return here, we'll continue anyway to send messages
       }
 
-      // Step 4: Send welcome messages to make the group chat visible to all members
-      // First, send a creation message
+      // Send welcome messages to make the group chat visible to all members
+      // First send a creation message
       const creationMessage = {
         text: `Created group chat "${groupName}"`, // Message text
         sender: currentUserEmail,                 // From the creator
@@ -333,7 +329,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         console.error("Error sending creation message:", error);
       }
 
-      // Step 5: Send individual "added" messages for each member
+      // Send individual "added" messages for each member
       // This helps trigger notifications for each member
       for (const friend of selectedFriends) {
         // Create a message saying this friend was added
@@ -360,7 +356,7 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         }
       }
 
-      // Step 6: Save to localStorage for backward compatibility
+      // Save to localStorage for backward compatibility
       // Some parts of the app might still use localStorage instead of state
       try {
         // Get existing group chats from localStorage
@@ -386,13 +382,13 @@ function GroupChatCreator({ currentUserEmail, onGroupChatCreated }) {
         console.error("Error saving to localStorage:", storageError);
       }
 
-      // Step 7: Update UI to show success and reset form
+      // Update UI to show success and reset form
       setSuccess("Group chat created successfully!");
       setGroupName(""); // Clear the group name input
       setSelectedFriends([]); // Clear the selected friends
       setSearchTerm(""); // Clear the search box
 
-      // Step 8: Notify the parent component about the new group chat
+      // Notify the parent component about the new group chat
       // This allows the parent to update its state and show the new chat
       if (onGroupChatCreated) {
         onGroupChatCreated(newGroupChat);
