@@ -1,199 +1,255 @@
+// Import React and its hooks for building our component
 import React, { useState, useEffect } from "react";
+// Import navigation hook to redirect users
 import { useNavigate } from "react-router-dom";
+// Import Supabase client for database operations
 import * as SupabaseClient from "@supabase/supabase-js";
+// Import CSS styles for this page
 import "../styles/HomePage.css";
-import ChatApp from "./ChatApp";
-import FriendSystem from "./FriendSystem";
-import ProfileEditor from "./ProfileEditor";
-import GroupChatCreator from "./GroupChatCreator";
-import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
+// Import all the components we'll use on this page
+import ChatApp from "./ChatApp";               // The chat interface component
+import FriendSystem from "./FriendSystem";     // The friend management component
+import ProfileEditor from "./ProfileEditor";   // The profile editing component
+import GroupChatCreator from "./GroupChatCreator"; // Component for creating group chats
+import avatars, { CUSTOM_AVATAR_ID } from "./avatars"; // Avatar images and constants
+// Import our notification system
 import { useNotifications } from "./NotificationContext";
 
+// Connection details for our Supabase database
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
+// Create a Supabase client we'll use throughout the component
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Main component for the home page - this is what users see after logging in
 function HomePage({ onLogout }) {
+  // Hook for navigating between pages
   const navigate = useNavigate();
+
+  // Get notification data from our notification context
   const {
-    unreadGlobal: unreadGlobalChat,
-    unreadFriends: unreadFriendMessages,
-    unreadGroups: unreadGroupMessages,
-    markAsRead: markChatAsRead
+    unreadGlobal: unreadGlobalChat,         // Boolean for unread global chat messages
+    unreadFriends: unreadFriendMessages,    // Object mapping friend emails to boolean
+    unreadGroups: unreadGroupMessages,      // Object mapping group IDs to boolean
+    markAsRead: markChatAsRead              // Function to mark chats as read
   } = useNotifications();
 
-  const [userEmail, setUserEmail] = useState("");
-  const [userName, setUserName] = useState("");
-  const [userAvatarId, setUserAvatarId] = useState(1); // Default avatar ID
-  const [userCustomAvatarUrl, setUserCustomAvatarUrl] = useState(""); // Custom avatar URL
-  const [friends, setFriends] = useState([]);
-  const [friendDisplayNames, setFriendDisplayNames] = useState({});
-  const [friendAvatarIds, setFriendAvatarIds] = useState({});
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [groupChats, setGroupChats] = useState([]);
-  const [activeSection, setActiveSection] = useState("home");
-  const [selectedFriend, setSelectedFriend] = useState("");
-  const [selectedGroupChat, setSelectedGroupChat] = useState(null);
-  const [showGroupChatCreator, setShowGroupChatCreator] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filteredFriends, setFilteredFriends] = useState([]);
-  const [filteredGroupChats, setFilteredGroupChats] = useState([]);
+  // User information state
+  const [userEmail, setUserEmail] = useState("");                // The current user's email
+  const [userName, setUserName] = useState("");                  // The current user's display name
+  const [userAvatarId, setUserAvatarId] = useState(1);           // The current user's avatar ID
+  const [userCustomAvatarUrl, setUserCustomAvatarUrl] = useState(""); // URL for custom avatar
 
-  // Local state for notifications (in addition to context)
-  const [localUnreadFriendMessages, setLocalUnreadFriendMessages] = useState({});
-  const [localUnreadGroupMessages, setLocalUnreadGroupMessages] = useState({});
+  // Friends state
+  const [friends, setFriends] = useState([]);                    // List of friend emails
+  const [friendDisplayNames, setFriendDisplayNames] = useState({}); // Map of emails to display names
+  const [friendAvatarIds, setFriendAvatarIds] = useState({});    // Map of emails to avatar IDs
+  const [pendingRequests, setPendingRequests] = useState([]);    // List of pending friend requests
 
+  // Group chats state
+  const [groupChats, setGroupChats] = useState([]);              // List of group chats
+
+  // UI navigation state
+  const [activeSection, setActiveSection] = useState("home");    // Current active section (home/friends/chat)
+  const [selectedFriend, setSelectedFriend] = useState("");      // Currently selected friend for DM
+  const [selectedGroupChat, setSelectedGroupChat] = useState(null); // Currently selected group chat
+  const [showGroupChatCreator, setShowGroupChatCreator] = useState(false); // Whether to show group creator
+
+  // Search functionality state
+  const [searchTerm, setSearchTerm] = useState("");              // Current search term
+  const [filteredFriends, setFilteredFriends] = useState([]);    // Friends filtered by search
+  const [filteredGroupChats, setFilteredGroupChats] = useState([]); // Group chats filtered by search
+
+  // Local notification state (in addition to context)
+  // We use both for redundancy and to ensure notifications work correctly
+  const [localUnreadFriendMessages, setLocalUnreadFriendMessages] = useState({}); // Local friend notifications
+  const [localUnreadGroupMessages, setLocalUnreadGroupMessages] = useState({});   // Local group notifications
+
+  // This effect runs when the component mounts to load the user's data
   useEffect(() => {
+    // Function to fetch the current user's data from Supabase
     async function fetchUserData() {
+      // Check if there's an active session (user is logged in)
       const { data: { session } } = await supabase.auth.getSession();
+
+      // If no session or no user email, redirect to login page
       if (!session?.user?.email) return navigate("/login");
 
+      // Get the user's email from the session
       const email = session.user.email;
-      setUserEmail(email);
+      setUserEmail(email); // Store the email in state
 
+      // Get the user's profile data from the database
       const { data: userData } = await supabase
         .from("users")
         .select("*")
-        .eq("email", email)
-        .single();
+        .eq("email", email) // Find the user with this email
+        .single();          // We expect only one result
 
+      // If we found user data, update the state with it
       if (userData) {
+        // Set the user's display name (fall back to name or email if no display name)
         setUserName(userData.displayname || userData.name || userData.email);
-        setUserAvatarId(userData.avatar_id || 1); // Default to 1 if not set
-        setUserCustomAvatarUrl(userData.custom_avatar_url || ""); // Get custom avatar URL if exists
+        // Set the user's avatar ID (default to 1 if not set)
+        setUserAvatarId(userData.avatar_id || 1);
+        // Set the custom avatar URL if the user has one
+        setUserCustomAvatarUrl(userData.custom_avatar_url || "");
       }
     }
 
+    // Call the function to load the user data
     fetchUserData();
-  }, [navigate]);
+  }, [navigate]); // Re-run if navigate changes (unlikely)
 
-  // Function to load last read timestamps from localStorage
+  // Helper function to get the timestamps of when the user last read each chat
+  // We use these timestamps to determine which chats have unread messages
   const loadLastReadTimestamps = () => {
     try {
-      // Use the same key as NotificationContext
+      // Use the same key as NotificationContext for consistency
       const LS_KEY = 'yap_last_read';
+      // Get the stored data from localStorage, or use default empty structure if none exists
       const lastReadData = JSON.parse(localStorage.getItem(`${LS_KEY}_${userEmail}`) || '{"global":0,"friends":{},"groups":{}}');
 
-      // Ensure the data structure is complete
+      // Make sure all the expected properties exist
       if (!lastReadData.friends) lastReadData.friends = {};
       if (!lastReadData.groups) lastReadData.groups = {};
 
+      // Return just the friends and groups timestamps (we handle global separately)
       return {
-        friends: lastReadData.friends,
-        groups: lastReadData.groups
+        friends: lastReadData.friends, // Object mapping friend emails to timestamps
+        groups: lastReadData.groups    // Object mapping group IDs to timestamps
       };
     } catch (error) {
+      // If there's any error (like invalid JSON), log it and return empty objects
       console.error("Error loading last read timestamps:", error);
       return { friends: {}, groups: {} };
     }
   };
 
-  // Custom function to mark chats as read in both context and local state
+  // Function to mark a chat as read when the user views it
+  // This updates both the notification context and our local state
   const markChatAsReadBoth = (type, id = null) => {
-    // First, use the context function to update the notification context
+    // First, use the context function to update the global notification state
     markChatAsRead(type, id);
 
-    // Then, update our local state
+    // Then, update our local state for redundancy
     if (type === 'friend' && id) {
+      // For friend chats, remove this friend from the unread list
       setLocalUnreadFriendMessages(prev => {
         const updated = { ...prev };
-        delete updated[id];
+        delete updated[id]; // Remove this friend from unread messages
         return updated;
       });
 
-      // Also update localStorage directly to ensure timestamps are updated
+      // Also update localStorage directly with the current timestamp
       const LS_KEY = 'yap_last_read';
       const lastReadData = JSON.parse(localStorage.getItem(`${LS_KEY}_${userEmail}`) || '{"global":0,"friends":{},"groups":{}}');
       if (!lastReadData.friends) lastReadData.friends = {};
-      lastReadData.friends[id] = Date.now();
+      lastReadData.friends[id] = Date.now(); // Set the current time as last read
       localStorage.setItem(`${LS_KEY}_${userEmail}`, JSON.stringify(lastReadData));
       console.log(`DEBUG: Updated lastRead timestamp for friend ${id} to ${new Date().toISOString()}`);
 
     } else if (type === 'group' && id) {
+      // For group chats, remove this group from the unread list
       setLocalUnreadGroupMessages(prev => {
         const updated = { ...prev };
-        delete updated[id];
+        delete updated[id]; // Remove this group from unread messages
         return updated;
       });
 
-      // Also update localStorage directly to ensure timestamps are updated
+      // Also update localStorage directly with the current timestamp
       const LS_KEY = 'yap_last_read';
       const lastReadData = JSON.parse(localStorage.getItem(`${LS_KEY}_${userEmail}`) || '{"global":0,"friends":{},"groups":{}}');
       if (!lastReadData.groups) lastReadData.groups = {};
-      lastReadData.groups[id] = Date.now();
+      lastReadData.groups[id] = Date.now(); // Set the current time as last read
       localStorage.setItem(`${LS_KEY}_${userEmail}`, JSON.stringify(lastReadData));
       console.log(`DEBUG: Updated lastRead timestamp for group ${id} to ${new Date().toISOString()}`);
 
     } else if (type === 'global') {
-      // Update global chat timestamp
+      // For global chat, update the global timestamp
       const LS_KEY = 'yap_last_read';
       const lastReadData = JSON.parse(localStorage.getItem(`${LS_KEY}_${userEmail}`) || '{"global":0,"friends":{},"groups":{}}');
-      lastReadData.global = Date.now();
+      lastReadData.global = Date.now(); // Set the current time as last read
       localStorage.setItem(`${LS_KEY}_${userEmail}`, JSON.stringify(lastReadData));
       console.log(`DEBUG: Updated lastRead timestamp for global chat to ${new Date().toISOString()}`);
     }
   };
 
-  // Effect to mark chats as read when they are opened
+  // This effect automatically marks chats as read when the user opens them
   useEffect(() => {
+    // Only run this if we're in the chat section and have a valid user
     if (activeSection === "chat" && userEmail) {
+      // Log which chat is being opened for debugging
       console.log("DEBUG: Chat opened - activeSection:", activeSection);
       console.log("DEBUG: Chat opened - selectedFriend:", selectedFriend);
       console.log("DEBUG: Chat opened - selectedGroupChat:", selectedGroupChat);
 
+      // Case 1: A friend's direct message chat is open
       if (selectedFriend) {
         console.log("DEBUG: Marking friend chat as read:", selectedFriend);
-        markChatAsReadBoth('friend', selectedFriend);
-      } else if (selectedGroupChat) {
+        markChatAsReadBoth('friend', selectedFriend); // Mark this friend's chat as read
+      }
+      // Case 2: A group chat is open
+      else if (selectedGroupChat) {
         console.log("DEBUG: Marking group chat as read:", selectedGroupChat.id);
-        markChatAsReadBoth('group', selectedGroupChat.id);
-      } else {
+        markChatAsReadBoth('group', selectedGroupChat.id); // Mark this group chat as read
+      }
+      // Case 3: The global chat is open (no friend or group selected)
+      else {
         console.log("DEBUG: Marking global chat as read");
-        markChatAsReadBoth('global');
+        markChatAsReadBoth('global'); // Mark the global chat as read
       }
     }
   }, [activeSection, selectedFriend, selectedGroupChat, userEmail, markChatAsRead]);
+  // Re-run this effect when any of these values change
 
-  // Debug effect to log notification state changes
+  // Debug effect to log when global chat notification state changes
+  // This helps us track notification system behavior
   useEffect(() => {
     console.log("DEBUG: unreadGlobalChat changed:", unreadGlobalChat);
-  }, [unreadGlobalChat]);
+  }, [unreadGlobalChat]); // Re-run when unreadGlobalChat changes
 
+  // Debug effect to log when friend notifications change
   useEffect(() => {
     console.log("DEBUG: unreadFriendMessages changed:", unreadFriendMessages);
 
-    // Log the specific friend emails that have unread messages
+    // Log which specific friends have unread messages
     if (unreadFriendMessages && Object.keys(unreadFriendMessages).length > 0) {
       console.log("DEBUG: Friends with unread messages:", Object.keys(unreadFriendMessages));
     }
-  }, [unreadFriendMessages]);
+  }, [unreadFriendMessages]); // Re-run when unreadFriendMessages changes
 
+  // Debug effect to log when group chat notifications change
   useEffect(() => {
     console.log("DEBUG: unreadGroupMessages changed:", unreadGroupMessages);
 
-    // Log the specific group chat IDs that have unread messages
+    // Log which specific group chats have unread messages
     if (unreadGroupMessages && Object.keys(unreadGroupMessages).length > 0) {
       console.log("DEBUG: Group chats with unread messages:", Object.keys(unreadGroupMessages));
     }
-  }, [unreadGroupMessages]);
+  }, [unreadGroupMessages]); // Re-run when unreadGroupMessages changes
 
-  // We're now using the NotificationContext for all notification handling
+  // Note: We're using the NotificationContext for all notification handling
+  // These local state variables provide redundancy and immediate UI updates
 
-  // Use the markChatAsRead function from the notification context
-
+  // This is the main initialization effect that runs when the user email is available
+  // It sets up real-time updates and periodic refreshes for friends and group chats
   useEffect(() => {
+    // Don't do anything if we don't have a user email yet
     if (!userEmail) return;
 
-    // Initialize app
+    // Function to initialize all the app data
     const initializeApp = async () => {
-      await refreshFriendsList();
-      await initializeGroupChats();
-      await refreshPendingRequests();
+      await refreshFriendsList();     // Load the user's friends
+      await initializeGroupChats();   // Load the user's group chats
+      await refreshPendingRequests(); // Load pending friend requests
     };
 
+    // Run the initialization
     initializeApp();
 
-    // Set up periodic refresh for friends, group chats, and pending requests
+    // Set up a timer to periodically refresh all data
+    // This ensures the UI stays up-to-date even if real-time updates fail
     const refreshInterval = setInterval(async () => {
       console.log("Periodic refresh of friends, group chats, and pending requests");
       await refreshFriendsList();
@@ -201,132 +257,157 @@ function HomePage({ onLogout }) {
       await refreshPendingRequests();
     }, 5000); // Refresh every 5 seconds
 
-    // Create unique channel names for this user
+    // Create a unique prefix for channel names based on the user's email
+    // This prevents conflicts with other users' channels
     const userPrefix = userEmail.replace(/[^a-zA-Z0-9]/g, '');
 
-    // Set up real-time subscription for friend requests involving this user
+    // Set up real-time subscription for friend requests
+    // This will update the UI immediately when friend request status changes
     console.log("Setting up real-time subscription for friend requests");
     const friendRequestsSub = supabase
       .channel(`friend-requests-${userPrefix}`)
+      // Listen for changes to requests sent by this user
       .on(
-        "postgres_changes",
+        "postgres_changes", // Listen for database changes
         {
-          event: "*",
-          schema: "public",
-          table: "friend_requests",
-          filter: `sender_email=eq.${userEmail}`
+          event: "*",                // Any event (insert, update, delete)
+          schema: "public",          // In the public schema
+          table: "friend_requests",  // On the friend_requests table
+          filter: `sender_email=eq.${userEmail}` // Where user is the sender
         },
         (payload) => {
+          // When a change is detected, refresh the friends list
           console.log("Friend request from current user updated:", payload);
           refreshFriendsList();
         }
       )
+      // Also listen for changes to requests received by this user
       .on(
-        "postgres_changes",
+        "postgres_changes", // Listen for database changes
         {
-          event: "*",
-          schema: "public",
-          table: "friend_requests",
-          filter: `receiver_email=eq.${userEmail}`
+          event: "*",                // Any event (insert, update, delete)
+          schema: "public",          // In the public schema
+          table: "friend_requests",  // On the friend_requests table
+          filter: `receiver_email=eq.${userEmail}` // Where user is the receiver
         },
         (payload) => {
+          // When a change is detected, refresh the friends list
           console.log("Friend request to current user updated:", payload);
           refreshFriendsList();
         }
       )
       .subscribe();
 
-    // Set up real-time subscription for group chat creation messages
+    // Set up real-time subscription for when the user is added to a group chat
+    // This detects special system messages that indicate group chat additions
     const groupChatCreationSub = supabase
       .channel(`group-chat-creation-${userPrefix}`)
       .on(
-        "postgres_changes",
+        "postgres_changes", // Listen for database changes
         {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `text=like.%Added ${userEmail} to the group chat%`
+          event: "INSERT",           // Only new messages
+          schema: "public",          // In the public schema
+          table: "messages",         // On the messages table
+          filter: `text=like.%Added ${userEmail} to the group chat%` // Special message text
         },
         (payload) => {
+          // When the user is added to a group, refresh group chats
           console.log("User was added to a group chat:", payload);
-          initializeGroupChats();
-          refreshGroups(); // Update the notification context
+          initializeGroupChats(); // Refresh the group chats list
+          refreshGroups();        // Update the notification context
         }
       )
       .subscribe();
 
     console.log("Real-time subscriptions active");
 
+    // Clean up function that runs when the component unmounts
+    // or when userEmail changes
     return () => {
       console.log("Cleaning up subscriptions and interval");
-      clearInterval(refreshInterval);
-      supabase.removeChannel(friendRequestsSub);
-      supabase.removeChannel(groupChatCreationSub);
+      clearInterval(refreshInterval);              // Stop the periodic refresh
+      supabase.removeChannel(friendRequestsSub);   // Remove friend requests subscription
+      supabase.removeChannel(groupChatCreationSub); // Remove group chat subscription
     };
-  }, [userEmail]);
+  }, [userEmail]); // Re-run this effect when the user email changes
 
+  // Function to load the user's friends list and their details
   const refreshFriendsList = async () => {
     try {
       console.log("DEBUG: Refreshing friends list for user:", userEmail);
 
+      // Step 1: Get all accepted friend requests involving this user
       const { data, error } = await supabase
         .from("friend_requests")
         .select("*")
-        .or(`sender_email.eq.${userEmail},receiver_email.eq.${userEmail}`)
-        .eq("status", "accepted");
+        .or(`sender_email.eq.${userEmail},receiver_email.eq.${userEmail}`) // Either sender or receiver
+        .eq("status", "accepted"); // Only accepted requests (these are actual friends)
 
+      // Handle errors or no data
       if (!data || error) {
         console.error("DEBUG: Error fetching friend requests:", error);
-        return [];
+        return []; // Return empty array if there's an error
       }
 
+      // Step 2: Extract the email addresses of all friends
+      // For each request, get the email of the other person (not the current user)
       const emails = data.map(req =>
         req.sender_email === userEmail ? req.receiver_email : req.sender_email
       );
       console.log("DEBUG: Found friends:", emails);
 
+      // Update state with the list of friend emails
       setFriends(emails);
-      setFilteredFriends(emails); // Initialize filtered friends with all friends
+      setFilteredFriends(emails); // Initialize filtered list with all friends
 
+      // Step 3: Get additional details for each friend (display name, avatar)
       const { data: users, error: usersError } = await supabase
         .from("users")
         .select("email, displayname, avatar_id, custom_avatar_url")
-        .in("email", emails);
+        .in("email", emails); // Get all these users in one query
 
+      // Handle errors getting user details
       if (usersError) {
         console.error("DEBUG: Error fetching user details for friends:", usersError);
       }
 
-      const nameMap = {};
-      const avatarMap = {};
-      const customAvatarMap = {};
-      users?.forEach(u => {
-        nameMap[u.email] = u.displayname || u.email;
-        avatarMap[u.email] = u.avatar_id || 1; // Default to 1 if not set
+      // Step 4: Create maps for display names, avatar IDs, and custom avatars
+      const nameMap = {};      // Maps email to display name
+      const avatarMap = {};    // Maps email to avatar ID
+      const customAvatarMap = {}; // Maps email to custom avatar URL
 
-        // Store custom avatar URLs in a separate state
+      // Process each user and fill the maps
+      users?.forEach(u => {
+        nameMap[u.email] = u.displayname || u.email; // Use display name or fall back to email
+        avatarMap[u.email] = u.avatar_id || 1; // Default to avatar 1 if not set
+
+        // Store custom avatar URLs separately
         if (u.avatar_id === CUSTOM_AVATAR_ID && u.custom_avatar_url) {
           customAvatarMap[u.email] = u.custom_avatar_url;
         }
       });
+
+      // Update state with the maps
       setFriendDisplayNames(nameMap);
       setFriendAvatarIds(avatarMap);
 
       // Store custom avatar URLs in localStorage for easy access across components
       localStorage.setItem('friendCustomAvatars', JSON.stringify(customAvatarMap));
 
-      // Apply search filter if there's an active search
+      // Step 5: Apply search filter if there's an active search
       if (searchTerm) {
         handleSearch(searchTerm);
       }
 
-      // Check for unread messages from these friends
+      // Step 6: Check for unread messages from these friends
       try {
+        // Get the timestamps of when the user last read each friend's messages
         const lastReadTimestamps = loadLastReadTimestamps();
         const lastReadFriends = lastReadTimestamps.friends || {};
 
         console.log("DEBUG: Checking for unread messages from friends with last read timestamps:", lastReadFriends);
 
+        // Check for new messages since the last read time
         await checkForNewFriendMessages(lastReadFriends);
       } catch (error) {
         console.error("DEBUG: Error checking for unread friend messages during refresh:", error);
@@ -334,54 +415,61 @@ function HomePage({ onLogout }) {
 
       return emails; // Return the friends list for use in other functions
     } catch (error) {
+      // Handle any unexpected errors
       console.error("DEBUG: Error refreshing friends list:", error);
       return [];
     }
   };
 
-  // Function to initialize group chat state
+  // Function to load all group chats the user is a member of
   const initializeGroupChats = async () => {
     try {
       console.log("DEBUG: Initializing group chats for user:", userEmail);
 
+      // Make sure we have a valid user email
       if (!userEmail) {
         console.log("DEBUG: No user email available, skipping group chat initialization");
         return false;
       }
 
-      // 1. Get all group chats where the user is a member using the group_chat_members table
+      // Step 1: Find all group chats where the user is a member
+      // We use the group_chat_members table which links users to group chats
       const { data: memberData, error: memberError } = await supabase
         .from("group_chat_members")
         .select("group_id")
-        .eq("member_email", userEmail);
+        .eq("member_email", userEmail); // Find entries for this user
 
+      // Handle errors finding memberships
       if (memberError) {
         console.error("DEBUG: Error fetching group chat memberships:", memberError);
         return false;
       }
 
+      // Handle case where user isn't in any group chats
       if (!memberData || memberData.length === 0) {
         console.log("DEBUG: User is not a member of any group chats");
-        setGroupChats([]);
-        setFilteredGroupChats([]);
+        setGroupChats([]);          // Clear group chats state
+        setFilteredGroupChats([]); // Clear filtered group chats
         return true;
       }
 
-      // Extract group IDs
+      // Extract just the group IDs from the membership data
       const groupIds = memberData.map(item => item.group_id);
       console.log("DEBUG: User is a member of group chats with IDs:", groupIds);
 
-      // 2. Get details for these group chats
+      // Step 2: Get the details for each group chat (name, creator, etc.)
       const { data: groupChatsData, error: groupChatsError } = await supabase
         .from("group_chats")
         .select("*")
-        .in("id", groupIds);
+        .in("id", groupIds); // Get all these group chats in one query
 
+      // Handle errors getting group details
       if (groupChatsError) {
         console.error("DEBUG: Error fetching group chat details:", groupChatsError);
         return false;
       }
 
+      // Handle case where no group details were found
       if (!groupChatsData || groupChatsData.length === 0) {
         console.log("DEBUG: No group chat details found");
         setGroupChats([]);
@@ -391,108 +479,129 @@ function HomePage({ onLogout }) {
 
       console.log("DEBUG: Fetched group chat details:", groupChatsData);
 
-      // 3. For each group chat, get its members
+      // Step 3: For each group chat, get all its members
+      // We use Promise.all to run all these queries in parallel
       const enhancedGroupChats = await Promise.all(groupChatsData.map(async (chat) => {
-        // Get members for this group chat
+        // Get all members for this specific group chat
         const { data: chatMembers, error: membersError } = await supabase
           .from("group_chat_members")
           .select("member_email")
           .eq("group_id", chat.id);
 
+        // Handle errors getting members
         if (membersError) {
           console.error(`DEBUG: Error fetching members for group chat ${chat.id}:`, membersError);
           return {
             ...chat,
-            members: [userEmail] // Default to just the current user
+            members: [userEmail] // Default to just the current user if we can't get members
           };
         }
 
+        // Return the chat with its members added
         return {
-          ...chat,
-          members: chatMembers.map(m => m.member_email)
+          ...chat, // All the original chat data
+          members: chatMembers.map(m => m.member_email) // Add the members array
         };
       }));
 
       console.log("DEBUG: Enhanced group chats with members:", enhancedGroupChats);
 
-      // 4. Update state with the group chats
+      // Step 4: Update state with the complete group chat data
       setGroupChats(enhancedGroupChats);
       setFilteredGroupChats(enhancedGroupChats);
 
-      // 5. Also update localStorage for backward compatibility
+      // Step 5: Also save to localStorage for backward compatibility
+      // Some parts of the app might still use localStorage instead of state
       try {
         localStorage.setItem('groupChats', JSON.stringify(enhancedGroupChats));
       } catch (storageError) {
         console.error("DEBUG: Error saving group chats to localStorage:", storageError);
       }
 
-      // 6. Check for unread messages in these group chats
+      // Step 6: Check for unread messages in these group chats
       try {
+        // Get the timestamps of when the user last read each group chat
         const lastReadTimestamps = loadLastReadTimestamps();
         const lastReadGroups = lastReadTimestamps.groups || {};
 
         console.log("DEBUG: Checking for unread messages in group chats with last read timestamps:", lastReadGroups);
 
+        // Check for new messages since the last read time
         await checkForNewGroupMessages(lastReadGroups);
       } catch (error) {
         console.error("DEBUG: Error checking for unread group messages during initialization:", error);
       }
 
-      return true;
+      return true; // Success
     } catch (err) {
+      // Handle any unexpected errors
       console.error("DEBUG: Error initializing group chats:", err);
       return false;
     }
   };
 
-  // Function to handle search
+  // Function to filter friends and group chats based on search input
   const handleSearch = (searchValue) => {
+    // Update the search term state
     setSearchTerm(searchValue);
 
-    // Filter friends
+    // Filter the friends list based on the search term
     if (friends.length > 0) {
+      // Create a filtered list of friends whose display names match the search
       const filtered = friends.filter(friend => {
+        // Get the display name for this friend (fall back to email if no display name)
         const displayName = friendDisplayNames[friend] || friend;
+        // Check if the display name contains the search term (case-insensitive)
         return displayName.toLowerCase().includes(searchValue.toLowerCase());
       });
+      // Update the filtered friends state
       setFilteredFriends(filtered);
     }
 
-    // Filter group chats
+    // Filter the group chats list based on the search term
     if (groupChats.length > 0) {
+      // Create a filtered list of group chats whose names match the search
       const filtered = groupChats.filter(chat =>
+        // Check if the group name contains the search term (case-insensitive)
         chat.name.toLowerCase().includes(searchValue.toLowerCase())
       );
+      // Update the filtered group chats state
       setFilteredGroupChats(filtered);
     }
   };
 
 
-
-
-
+  // Function to handle user logout
   const handleLogout = async () => {
+    // Sign out the user from Supabase authentication
     await supabase.auth.signOut();
+
+    // Call the onLogout callback passed from the parent component
     if (onLogout) onLogout();
+
+    // Redirect to the login page
     navigate("/login");
   };
 
-  // Handle profile updates
+  // Function to handle when the user updates their profile
   const handleProfileUpdate = (profileData) => {
-    // Update the user name in the UI
+    // Update the user's display name in the UI
+    // Fall back to name or email if no display name is provided
     setUserName(profileData.displayname || profileData.name || userEmail);
 
-    // Update avatar ID if provided
+    // Update the user's avatar ID if it was changed
     if (profileData.avatar_id) {
       setUserAvatarId(profileData.avatar_id);
     }
 
-    // Update custom avatar URL if provided
+    // Update the custom avatar URL if it was changed
+    // We check for undefined because an empty string is valid (means removing the custom avatar)
     if (profileData.custom_avatar_url !== undefined) {
       setUserCustomAvatarUrl(profileData.custom_avatar_url);
     }
 
-    // Refresh friends list to update any display name changes
+    // Refresh the friends list to update any display name changes
+    // This ensures consistency across the app
     refreshFriendsList();
   };
 
