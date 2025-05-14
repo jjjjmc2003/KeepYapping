@@ -1,17 +1,12 @@
-// Import React and its hooks for building the component
 import React, { useState, useEffect } from "react";
-// Import Supabase client for database operations
 import * as SupabaseClient from "@supabase/supabase-js";
-// Import CSS styles for the friend system
 import "../styles/FriendSystem.css";
-// Import avatar images and the special ID for custom avatars
 import avatars, { CUSTOM_AVATAR_ID } from "./avatars";
 
-// Connection details for our Supabase database
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
-// Create a Supabase client we'll use throughout the component
+
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Main component for managing friends - searching, adding, and removing friends
@@ -93,10 +88,10 @@ function FriendSystem({ currentUserEmail }) {
       ];
 
       // Filter the suggestions to remove:
-      // 1. The current user (can't friend yourself)
-      // 2. People who are already your friends
-      // 3. People with pending friend requests
-      // 4. Users without a display name
+      // The current user can't friend yourself
+      // People who are already your friends
+      // People with pending friend requests
+      // Users without a display name
       const filteredSuggestions = data
         .filter(user =>
           user.email !== currentUserEmail && // Not the current user
@@ -105,7 +100,7 @@ function FriendSystem({ currentUserEmail }) {
           user.displayname // Has a display name
         );
 
-      // Update state with the filtered suggestions (limit to 5 for UI)
+      // Update state with the filtered suggestions limit to 5 for UI
       setUserSuggestions(filteredSuggestions.slice(0, 5));
       // Only show the dropdown if we have suggestions
       setShowSuggestions(filteredSuggestions.length > 0);
@@ -203,19 +198,19 @@ function FriendSystem({ currentUserEmail }) {
     if (existingRequests && existingRequests.length > 0) {
       const request = existingRequests[0];
 
-      // Case 1: They already sent you a request that's pending
+      // They already sent you a request that's pending
       if (request.sender_email === user.email && request.status === "pending") {
         setSearchError("This user has already sent you a friend request. Check your incoming requests.");
         return;
       }
 
-      // Case 2: You already sent them a request that's pending
+      // You already sent them a request that's pending
       if (request.sender_email === currentUserEmail && request.status === "pending") {
         setSearchError("You have already sent a friend request to this user.");
         return;
       }
 
-      // Case 3: There was a rejected request in the past
+      // There was a rejected request in the past
       // We'll delete it so they can try again
       if (request.status === "rejected") {
         console.log("Found a rejected request, deleting it to allow a new one");
@@ -251,7 +246,7 @@ function FriendSystem({ currentUserEmail }) {
       return;
     }
 
-    // Success! Show a confirmation and reset the form
+    // Show a confirmation and reset the form
     alert("Friend request sent!");
     setUser(null);      // Clear the search result
     setSearchTerm(""); // Clear the search input
@@ -649,7 +644,7 @@ function FriendSystem({ currentUserEmail }) {
       .on(
         "postgres_changes", // Listen for database changes
         {
-          event: "*",                // Any event (insert, update, delete)
+          event: "*",                // Any event insert, update, delete
           schema: "public",          // In the public schema
           table: "friend_requests",  // On the friend_requests table
           filter: `receiver_email=eq.${currentUserEmail}` // Where you're the receiver
@@ -658,7 +653,7 @@ function FriendSystem({ currentUserEmail }) {
           // When a change is detected, refresh the relevant data
           console.log("Incoming friend request change detected:", payload);
           fetchFriendRequests(); // Refresh incoming requests
-          fetchFriends();        // Refresh friends list (in case a request was accepted)
+          fetchFriends();        // Refresh friends list in case a request was accepted
         }
       )
       .subscribe();
@@ -670,7 +665,7 @@ function FriendSystem({ currentUserEmail }) {
       .on(
         "postgres_changes", // Listen for database changes
         {
-          event: "*",                // Any event (insert, update, delete)
+          event: "*",                // Any event insert, update, delete
           schema: "public",          // In the public schema
           table: "friend_requests",  // On the friend_requests table
           filter: `sender_email=eq.${currentUserEmail}` // Where you're the sender
@@ -679,7 +674,7 @@ function FriendSystem({ currentUserEmail }) {
           // When a change is detected, refresh the relevant data
           console.log("Outgoing friend request change detected:", payload);
           fetchOutgoingRequests(); // Refresh outgoing requests
-          fetchFriends();          // Refresh friends list (in case a request was accepted)
+          fetchFriends();          // Refresh friends list in case a request was accepted
         }
       )
       .subscribe();
@@ -716,7 +711,7 @@ function FriendSystem({ currentUserEmail }) {
         .from("friend_requests")
         .select("*")
         .ilike("sender_email", currentUserEmail) // Case-insensitive match on email
-        .eq("status", "pending"); // Only get pending requests (not accepted/rejected)
+        .eq("status", "pending"); // Only get pending requests not accepted/rejected
 
       // Handle any database errors
       if (error) {
@@ -762,9 +757,9 @@ function FriendSystem({ currentUserEmail }) {
       // Enhance each outgoing request with the receiver's display name and avatar
       const enhancedRequests = requestsData.map(req => ({
         ...req, // Keep all the original request data
-        // Add display name (fall back to email if no display name)
+        // Add display name fall back to email if no display name
         receiver_display_name: displayNameMap[req.receiver_email] || req.receiver_email,
-        // Add avatar ID (default to 1 if not found)
+        // Add avatar ID default to 1 if not found
         receiver_avatar_id: avatarIdMap[req.receiver_email] || 1
       }));
 
@@ -790,7 +785,7 @@ function FriendSystem({ currentUserEmail }) {
 
       {/* Main content container */}
       <div className="friend-system-content">
-        {/* SECTION 1: Search and add friends */}
+        {/* Search and add friends */}
         <div className="friend-section">
           <div className="friend-section-header">
             <h3>Add Friend</h3>
@@ -873,22 +868,22 @@ function FriendSystem({ currentUserEmail }) {
               <div className="friend-actions">
                 {/* Different cases based on the relationship with this user */}
                 {user.email === currentUserEmail ? (
-                  // Case 1: This is the current user
+                  // This is the current user
                   <div className="friend-status-message">This is you</div>
                 ) : (
-                  // Case 2: Check if they're already friends
+                  // Check if they're already friends
                   friends.includes(user.email) ? (
                     <div className="friend-status-message">Already friends</div>
                   ) : (
-                    // Case 3: Check if there's a pending outgoing request
+                    // Check if there's a pending outgoing request
                     outgoingRequests.some(req => req.receiver_email === user.email) ? (
                       <div className="friend-status-message">Request pending</div>
                     ) : (
-                      // Case 4: Check if there's a pending incoming request
+                      // Check if there's a pending incoming request
                       requests.some(req => req.sender_email === user.email) ? (
                         <div className="friend-status-message">Request received</div>
                       ) : (
-                        // Case 5: No relationship yet, show Add Friend button
+                        // No relationship yet, show Add Friend button
                         <button className="btn btn-success" onClick={sendFriendRequest}>
                           Send Friend Request
                         </button>
@@ -901,7 +896,7 @@ function FriendSystem({ currentUserEmail }) {
           )}
         </div>
 
-        {/* SECTION 2: Incoming friend requests */}
+        {/* Incoming friend requests */}
         <div className="friend-section">
           <div className="friend-section-header">
             <h3>Incoming Friend Requests</h3>
@@ -977,7 +972,7 @@ function FriendSystem({ currentUserEmail }) {
           ))}
         </div>
 
-        {/* SECTION 3: Outgoing friend requests */}
+        {/* Outgoing friend requests */}
         <div className="friend-section">
           <div className="friend-section-header">
             <h3>Outgoing Friend Requests</h3>
@@ -1029,7 +1024,7 @@ function FriendSystem({ currentUserEmail }) {
           ))}
         </div>
 
-        {/* SECTION 4: Current friends list with delete option */}
+        {/* Current friends list with delete option */}
         <div className="friend-section">
           <div className="friend-section-header">
             <h3>Delete Friends</h3>

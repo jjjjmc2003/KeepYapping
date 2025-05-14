@@ -1,12 +1,10 @@
-// ChatApp.jsx - The main chat component that handles all types of chats (global, direct messages, and group chats)
 import React, { useState, useEffect, useRef, use } from "react";
-import { createClient } from "@supabase/supabase-js"; // Import Supabase client for database operations
+import { createClient } from "@supabase/supabase-js"; 
 
-// Connection details for our Supabase database
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
-// Create a Supabase client instance we'll use throughout the component
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Main ChatApp component that handles all chat functionality
@@ -211,9 +209,9 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       fetchMessages();
     }, 3000); // Refresh every 3 seconds
 
-    // ===== REAL-TIME SUBSCRIPTIONS =====
+    //  REAL-TIME SUBSCRIPTIONS
 
-    // 1. Set up real-time subscription for global chat messages
+    // Set up real-time subscription for global chat messages
     const globalChatChannel = supabase
       .channel('global-chat-changes')
       .on(
@@ -236,7 +234,7 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       )
       .subscribe();
 
-    // 2. Set up real-time subscription for direct messages (DMs)
+    // Set up real-time subscription for direct messages (DMs)
     // Create a unique channel name using the user's email
     const dmChannel = supabase
       .channel(`dm-changes-${userEmail.replace(/[^a-zA-Z0-9]/g, '')}`)
@@ -254,9 +252,9 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
           console.log("DM received:", newMsg);
 
           // Check if this DM is relevant to the current chat:
-          // 1. It involves the current user (sender or recipient)
-          // 2. We're in DM mode
-          // 3. The selected user is the other person in the conversation
+          //  It involves the current user sender or recipient
+          //  We're in DM mode
+          //  The selected user is the other person in the conversation
           if ((newMsg.sender === userEmail || newMsg.recipient === userEmail) &&
               chatMode === "dm" &&
               (selectedUser === newMsg.sender || selectedUser === newMsg.recipient)) {
@@ -267,7 +265,7 @@ export default function ChatApp({ userEmail: propUserEmail, selectedFriend, sele
       )
       .subscribe();
 
-    // 3. Set up real-time subscription for group chat messages
+    // Set up real-time subscription for group chat messages
     const groupChatChannel = supabase
       .channel(`group-chat-changes-${userEmail.replace(/[^a-zA-Z0-9]/g, '')}`)
       .on(

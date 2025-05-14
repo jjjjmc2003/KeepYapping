@@ -1,20 +1,13 @@
-// Import React Router components for navigation and getting URL information
 import { Link, useNavigate, useLocation } from "react-router-dom";
-// Import React and hooks for creating components and managing state
 import React, { useState, useEffect } from "react";
-// Import Supabase client for authentication and database operations
 import * as SupabaseClient from "@supabase/supabase-js";
-// Import CSS styles for the authentication pages
 import "../styles/Auth.css";
-// Import the app logo to use as background
 import backgroundImage from "./Images/KeepYappingLogo.png";
 
-// Connection details for our Supabase database
 const SUPABASE_URL = "https://hhrycnrjoscmsxyidyiz.supabase.co";
-// This is the public API key (safe to include in frontend code)
+
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhocnljbnJqb3NjbXN4eWlkeWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTA4MDAsImV4cCI6MjA2MTY4NjgwMH0.iGX0viWQJG3QS_p2YCac6ySlcoH7RYNn-C77lMULNMg";
-// Create a Supabase client we can use throughout the component
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Login component - handles user authentication
@@ -34,7 +27,7 @@ function Login({ onLogin }) {
   // This effect checks if the user arrived at the login page after verifying their email
   // When a user clicks the verification link in their email, they get redirected here with a special URL hash
   useEffect(() => {
-    // Get the hash part of the URL (the part after the # symbol)
+    // Get the hash part of the URL the part after the # symbol
     const hash = location.hash;
 
     // If the hash contains 'verified', it means they just verified their email
@@ -46,13 +39,13 @@ function Login({ onLogin }) {
 
   // Function that handles the login form submission
   const handleLogin = async (e) => {
-    // Prevent the default form submission behavior (page reload)
+    // Prevent the default form submission behavior page reload
     e.preventDefault();
     // Clear any previous error messages
     setError("");
 
     try {
-      // Step 1: Attempt to sign in with Supabase authentication
+      // Attempt to sign in with Supabase authentication
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,     // Email from the form input
         password,  // Password from the form input
@@ -67,7 +60,7 @@ function Login({ onLogin }) {
       // Get the user object from the successful login
       const { user } = data;
 
-      // Step 2: Check if the user already has a profile in our users table
+      // Check if the user already has a profile in our users table
       // This is separate from authentication - it stores additional user info
       const { data: existingUser, error: selectError } = await supabase
         .from("users")
@@ -82,7 +75,7 @@ function Login({ onLogin }) {
         return; // Stop execution if there was a database error
       }
 
-      // Step 3: If the user doesn't have a profile yet, create one
+      // If the user doesn't have a profile yet, create one
       // This happens for first-time logins
       if (!existingUser) {
         await supabase.from("users").insert([
@@ -95,7 +88,7 @@ function Login({ onLogin }) {
         ]);
       }
 
-      // Step 4: Complete the login process
+      // Complete the login process
       setError(""); // Clear any errors (redundant but safe)
 
       // Call the onLogin callback passed from the parent component
@@ -220,40 +213,40 @@ function Login({ onLogin }) {
               <input
                 id="password"
                 type={showPassword ? "text" : "password"} // Toggle between text and password type
-                placeholder="Enter your password"         // Placeholder text
-                value={password}                          // Controlled input value
-                onChange={(e) => setPassword(e.target.value)} // Update state when typing
-                required                                  // HTML5 validation
+                placeholder="Enter your password"         
+                value={password}                         
+                onChange={(e) => setPassword(e.target.value)} 
+                required                                 
                 style={{
-                  width: "100%",                          // Full width
-                  backgroundColor: "#1e1e1e",             // Dark input background
-                  color: "#fff",                          // White text
-                  border: "1px solid #444",               // Dark border
-                  borderRadius: "8px",                    // Rounded corners
-                  padding: "0.75rem",                     // Inner spacing
-                  fontSize: "1rem",                       // Text size
-                  marginTop: "0.25rem",                   // Space after label
-                  paddingRight: "2.5rem"                  // Make room for the eye icon
+                  width: "100%",                         
+                  backgroundColor: "#1e1e1e",             
+                  color: "#fff",                         
+                  border: "1px solid #444",               
+                  borderRadius: "8px",                    
+                  padding: "0.75rem",                     
+                  fontSize: "1rem",                      
+                  marginTop: "0.25rem",                  
+                  paddingRight: "2.5rem"                  
                 }}
               />
               {/* Show/hide password toggle button */}
               <button
-                type="button"                             // Button type (not submit)
-                onClick={() => setShowPassword(!showPassword)} // Toggle password visibility
+                type="button"                            
+                onClick={() => setShowPassword(!showPassword)} 
                 style={{
-                  position: "absolute",                   // Position over the input
-                  right: "10px",                          // Distance from right
-                  top: "50%",                             // Center vertically
-                  transform: "translateY(-50%)",          // Adjust for perfect centering
-                  background: "none",                     // No background
-                  border: "none",                         // No border
-                  cursor: "pointer",                      // Show pointer on hover
-                  color: "#5865f2",                       // KeepYapping blue color
-                  fontSize: "1.5rem",                     // Icon size
-                  display: "flex",                        // Flexbox for centering
-                  alignItems: "center",                   // Center vertically
-                  justifyContent: "center",               // Center horizontally
-                  marginTop: "0.25rem",                   // Adjust position
+                  position: "absolute",                   
+                  right: "10px",                          
+                  top: "50%",                            
+                  transform: "translateY(-50%)",          
+                  background: "none",                   
+                  border: "none",                         
+                  cursor: "pointer",                     
+                  color: "#5865f2",                      
+                  fontSize: "1.5rem",          // Icon size
+                  display: "flex",                        
+                  alignItems: "center",                   
+                  justifyContent: "center",              
+                  marginTop: "0.25rem",                   
                 }}
                 aria-label={showPassword ? "Hide password" : "Show password"} // Accessibility label
               >
@@ -275,18 +268,18 @@ function Login({ onLogin }) {
           {/* Login button */}
           <button
             className="auth-button"
-            type="submit"                              // Submit the form when clicked
+            type="submit"                             
             style={{
-              backgroundColor: "#6366f1",              // Purple button
-              color: "white",                          // White text
-              fontWeight: "600",                       // Semi-bold text
-              border: "none",                          // No border
-              borderRadius: "8px",                     // Rounded corners
-              padding: "0.75rem",                      // Inner spacing
-              fontSize: "1rem",                        // Text size
-              cursor: "pointer",                       // Show pointer on hover
-              width: "100%",                           // Full width
-              transition: "background-color 0.3s",     // Smooth color transition
+              backgroundColor: "#6366f1",             
+              color: "white",                          
+              fontWeight: "600",                      
+              border: "none",                         
+              borderRadius: "8px",                     
+              padding: "0.75rem",                      
+              fontSize: "1rem",                        
+              cursor: "pointer",                       
+              width: "100%",                          
+              transition: "background-color 0.3s",     
             }}
             onMouseOver={(e) => (e.target.style.backgroundColor = "#4f46e5")} // Darker on hover
             onMouseOut={(e) => (e.target.style.backgroundColor = "#6366f1")}  // Normal when not hovering
