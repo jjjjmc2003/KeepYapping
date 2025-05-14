@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as SupabaseClient from "@supabase/supabase-js";
 import toast from 'react-hot-toast';
 
@@ -9,6 +9,10 @@ import toast from 'react-hot-toast';
  * It tracks unread messages in global chat, direct messages, and group chats.
  * The system uses Supabase real-time subscriptions to detect new messages and
  * localStorage to track when messages were last read.
+ *
+ * The notification system uses a batching and debouncing approach to prevent UI flickering
+ * when multiple messages arrive in quick succession. Instead of updating the state for each
+ * message individually, updates are collected and applied in a single batch after a short delay.
  */
 
 // Supabase connection setup
@@ -25,9 +29,9 @@ const LS_KEY = 'yap_last_read';
 /**
  * Loads the timestamp data of when messages were last read by the user
  *- The email of the current user
- * @param {string} userEmail 
+ * @param {string} userEmail
  * An object containing timestamps for global chat, friends, and groups
- * @returns {Object} 
+ * @returns {Object}
  */
 const loadReadMap = (userEmail) => {
   try {
@@ -55,9 +59,9 @@ const loadReadMap = (userEmail) => {
 /**
  * Saves the timestamp data of when messages were last read by the user
  *- The email of the current user
- * @param {string} userEmail 
+ * @param {string} userEmail
  * - The object containing timestamps for global chat, friends, and groups
- * @param {Object} map 
+ * @param {Object} map
  */
 const saveReadMap = (userEmail, map) => {
   try {
@@ -78,9 +82,9 @@ const saveReadMap = (userEmail, map) => {
  * NotificationProvider component that manages the notification state and logic
  * This component wraps the application and provides notification context to all children
  * Component props
- * @param {Object} props 
+ * @param {Object} props
  * - Child components
- * @param {React.ReactNode} props.children 
+ * @param {React.ReactNode} props.children
  */
 export const NotificationProvider = ({ children }) => {
   // Current authenticated user
@@ -99,11 +103,17 @@ export const NotificationProvider = ({ children }) => {
 
   // Notification states for different chat types
   // Boolean for global chat
-  const [unreadGlobal, setUnreadGlobal] = useState(false);  
-   // Object mapping friend emails to boolean
-  const [unreadFriends, setUnreadFriends] = useState({});  
+  const [unreadGlobal, setUnreadGlobal] = useState(false);
+  // Object mapping friend emails to boolean
+  const [unreadFriends, setUnreadFriends] = useState({});
   // Object mapping group IDs to boolean
-  const [unreadGroups, setUnreadGroups] = useState({});     
+  const [unreadGroups, setUnreadGroups] = useState({});
+
+  // Refs for batching notification updates
+  // These refs store pending updates without triggering re-renders
+  const pendingFriendUpdatesRef = useRef({}); // Stores pending friend notification updates
+  const pendingGroupUpdatesRef = useRef({}); // Stores pending group chat notification updates
+  const updateTimeoutRef = useRef(null); // Stores the timeout ID for debounced updates
 
   /**
    * Effect to get and track the current authenticated user
@@ -398,15 +408,81 @@ export const NotificationProvider = ({ children }) => {
   }, [subsReady, user, friends, myGroupIds]);
 
   /**
+   * Processes all pending notification updates in a batch
+   * This reduces UI flickering by updating state only once for multiple messages
+   *
+   * Instead of updating the React state for each incoming message (which would cause
+   * multiple re-renders), this function collects all updates and applies them at once.
+   * This is especially important when multiple messages arrive in quick succession,
+   * which can cause UI flickering on slower devices or network connections.
+   */
+  const processPendingUpdates = () => {
+    // Clear any existing timeout to prevent duplicate processing
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
+    }
+
+    // Process friend updates if there are any
+    const pendingFriendUpdates = pendingFriendUpdatesRef.current;
+    if (Object.keys(pendingFriendUpdates).length > 0) {
+      console.log("Processing batched friend updates:", pendingFriendUpdates);
+
+      // Update the unread friends state with all pending updates at once
+      // This causes only a single re-render for multiple friend messages
+      setUnreadFriends(prev => ({ ...prev, ...pendingFriendUpdates }));
+
+      // Clear the pending updates after processing
+      pendingFriendUpdatesRef.current = {};
+    }
+
+    // Process group updates if there are any
+    const pendingGroupUpdates = pendingGroupUpdatesRef.current;
+    if (Object.keys(pendingGroupUpdates).length > 0) {
+      console.log("Processing batched group updates:", pendingGroupUpdates);
+
+      // Update the unread groups state with all pending updates at once
+      // This causes only a single re-render for multiple group messages
+      setUnreadGroups(prev => ({ ...prev, ...pendingGroupUpdates }));
+
+      // Clear the pending updates after processing
+      pendingGroupUpdatesRef.current = {};
+    }
+  };
+
+  /**
+   * Schedules a batch update for notifications
+   * This debounces updates to prevent rapid UI changes
+   *
+   * Debouncing means we wait a short period after the last message arrives
+   * before updating the UI. If multiple messages arrive during this period,
+   * we'll only update the UI once after the debounce period ends.
+   *
+   * This is crucial for preventing flickering when messages arrive in bursts,
+   * especially on deployed environments like Netlify where network conditions
+   * and performance characteristics may differ from local development.
+   */
+  const scheduleBatchUpdate = () => {
+    // Clear any existing timeout to reset the debounce period
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    // Schedule a new update after a short delay
+    updateTimeoutRef.current = setTimeout(() => {
+      processPendingUpdates();
+    }, 300); // 300ms debounce time - adjust if needed for your application
+  };
+
+  /**
    * Handles incoming messages from the real-time subscription
    * Updates notification states and shows toast notifications
-   *- The payload from Supabase real-time subscription
-   * @param {Object} payload 
+   * @param {Object} payload - The payload from Supabase real-time subscription
    */
   const handleIncomingMessage = (payload) => {
     if (!user) return;
     // The new message that was inserted
-    const msg = payload.new;  
+    const msg = payload.new;
     console.log("New message received:", msg);
 
     // Ignore messages sent by the current user
@@ -418,11 +494,12 @@ export const NotificationProvider = ({ children }) => {
     // Load the last read timestamps
     const readMap = loadReadMap(user.email);
 
-    //  GLOBAL CHAT MESSAGES 
+    //  GLOBAL CHAT MESSAGES
     if (msg.type === 'group' && msg.recipient === 'group') {
       console.log("Global chat message received");
 
       // Mark global chat as having unread messages
+      // Global chat is simple enough to update directly
       setUnreadGlobal(true);
 
       // Show toast notification for global chat message
@@ -440,7 +517,7 @@ export const NotificationProvider = ({ children }) => {
       return;
     }
 
-    // DIRECT MESSAGES 
+    // DIRECT MESSAGES
     if (msg.type === 'dm') {
       console.log("Direct message received");
 
@@ -459,10 +536,12 @@ export const NotificationProvider = ({ children }) => {
           // Still mark it as unread even if not in friends list yet
           const lastRead = readMap.friends[sender] || 0;
           if (lastRead < Date.parse(msg.created_at)) {
-            console.log(`Setting unread message from ${sender} (not in friends list yet)`);
+            console.log(`Adding ${sender} to pending friend updates (not in friends list yet)`);
 
-            // Create a new object to ensure React re-renders
-            setUnreadFriends(prev => ({ ...prev, [sender]: true }));
+            // Add to pending updates instead of updating state directly
+            // This prevents immediate re-renders and allows batching with other updates
+            pendingFriendUpdatesRef.current[sender] = true;
+            scheduleBatchUpdate(); // Schedule a debounced update
           }
           // Skip further processing until we have updated friend data
           return;
@@ -471,10 +550,12 @@ export const NotificationProvider = ({ children }) => {
         // Check if message is newer than last read timestamp
         const lastRead = readMap.friends[sender] || 0;
         if (lastRead < Date.parse(msg.created_at)) {
-          console.log(`Setting unread message from ${sender}`);
+          console.log(`Adding ${sender} to pending friend updates`);
 
-          // Create a new object to ensure React re-renders
-          setUnreadFriends(prev => ({ ...prev, [sender]: true }));
+          // Add to pending updates instead of updating state directly
+          // This collects the update in our ref without triggering a re-render
+          pendingFriendUpdatesRef.current[sender] = true;
+          scheduleBatchUpdate(); // Schedule a debounced update
 
           // Find the friend's display name if available
           const friend = friendsList.find(f => f.email === sender);
@@ -496,7 +577,7 @@ export const NotificationProvider = ({ children }) => {
       return;
     }
 
-    // GROUP CHAT MESSAGES 
+    // GROUP CHAT MESSAGES
     if (msg.type === 'groupchat' && msg.recipient && msg.recipient.startsWith('group:')) {
       console.log("Group chat message received");
 
@@ -517,10 +598,12 @@ export const NotificationProvider = ({ children }) => {
       // Check if message is newer than last read timestamp
       const lastRead = readMap.groups[groupId] || 0;
       if (lastRead < Date.parse(msg.created_at)) {
-        console.log(`Setting unread message for group ${groupId}`);
+        console.log(`Adding group ${groupId} to pending group updates`);
 
-        // Create a new object to ensure React re-renders
-        setUnreadGroups(prev => ({ ...prev, [groupId]: true }));
+        // Add to pending updates instead of updating state directly
+        // This collects the update in our ref without triggering a re-render
+        pendingGroupUpdatesRef.current[groupId] = true;
+        scheduleBatchUpdate(); // Schedule a debounced update
 
         // Find the group name if available
         const group = groupsList.find(g => g.id === groupId);
@@ -669,9 +752,9 @@ export const NotificationProvider = ({ children }) => {
    * Marks a chat as read by updating the last read timestamp
    * Called when a user views a chat to clear notification indicators
    *- The type of chat ('global', 'friend', or 'group')
-   * @param {string} type 
+   * @param {string} type
    * - The ID of the chat (email for friend, group ID for group, null for global)
-   * @param {string|null} id 
+   * @param {string|null} id
    */
   const markAsRead = (type, id = null) => {
     if (!user) return;
@@ -721,6 +804,20 @@ export const NotificationProvider = ({ children }) => {
   };
 
   /**
+   * Effect to clean up any pending updates when component unmounts
+   * This prevents memory leaks and ensures we don't try to update state after unmounting
+   */
+  useEffect(() => {
+    return () => {
+      // Clear any pending timeout to prevent memory leaks
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+        updateTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  /**
    * Create the context value object containing all notification states and functions
    * This will be provided to all components that use the useNotifications hook
    */
@@ -760,9 +857,9 @@ export const NotificationProvider = ({ children }) => {
  * Custom hook to access the notification context from any component
  * This hook must be used within a component that is a child of NotificationProvider
  *The notification context value
- * @returns {Object} 
+ * @returns {Object}
  * If used outside of a NotificationProvider
- * @throws {Error} 
+ * @throws {Error}
  */
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
