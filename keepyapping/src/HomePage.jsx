@@ -831,100 +831,94 @@ function HomePage({ onLogout }) {
 
   // Function to check for new friend messages
   const checkForNewFriendMessages = async (lastReadTimestamps) => {
-    if (!userEmail || !lastReadTimestamps) return;
+  if (!userEmail || !lastReadTimestamps) return;
 
-    try {
-      // For each friend, check if there are any unread messages
-      for (const friendEmail of Object.keys(lastReadTimestamps)) {
-        const lastReadTime = lastReadTimestamps[friendEmail] || 0;
+  try {
+    for (const friendEmail of Object.keys(lastReadTimestamps)) {
+      const lastReadTime = lastReadTimestamps[friendEmail] || 0;
 
-        // Skip if we're currently viewing this friend's chat
-        if (activeSection === "chat" && selectedFriend === friendEmail) {
-          console.log(`DEBUG: Skipping unread check for friend ${friendEmail} (currently viewing)`);
-          continue;
-        }
-
-        // Query for messages from this friend that are newer than the last read timestamp
-        // We need to check both directions (messages from friend to user and from user to friend)
-        const { data, error } = await supabase
-          .from("messages")
-          .select("created_at, sender, recipient")
-          .eq("type", "dm")
-          .or(`and(sender.eq.${friendEmail},recipient.eq.${userEmail}),and(sender.eq.${userEmail},recipient.eq.${friendEmail})`)
-          .gt("created_at", new Date(lastReadTime).toISOString())
-          .neq("sender", userEmail) 
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (error) {
-          console.error(`DEBUG: Error checking for new messages from ${friendEmail}:`, error);
-          continue;
-        }
-
-        // If there are unread messages, update the unread state
-        if (data && data.length > 0) {
-          console.log(`DEBUG: Found unread messages from ${friendEmail}`);
-
-          // Update the local notification state
-          const newUnreadFriendMessages = {...localUnreadFriendMessages};
-          newUnreadFriendMessages[friendEmail] = true;
-
-          // This is a direct state update, not using the context
-          setLocalUnreadFriendMessages(newUnreadFriendMessages);
-        }
+      // Skip if currently viewing this chat
+      if (activeSection === "chat" && selectedFriend === friendEmail) {
+        continue;
       }
-    } catch (error) {
-      console.error("DEBUG: Error checking for new friend messages:", error);
+
+      const { data, error } = await supabase
+        .from("messages")
+        .select("created_at, sender, recipient")
+        .eq("type", "dm")
+        .or(`and(sender.eq.${friendEmail},recipient.eq.${userEmail}),and(sender.eq.${userEmail},recipient.eq.${friendEmail})`)
+        .gt("created_at", new Date(lastReadTime).toISOString())
+        .neq("sender", userEmail)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error(`DEBUG: Error checking for new messages from ${friendEmail}:`, error);
+        continue;
+      }
+
+      if (data && data.length > 0) {
+        console.log(`DEBUG: Found unread messages from ${friendEmail}`);
+        
+        // Only update state if this friend doesn't already have unread messages
+        setLocalUnreadFriendMessages(prev => {
+          // If already marked unread, don't update state at all
+          if (prev[friendEmail] === true) {
+            return prev; // Keep the SAME object reference
+          }
+          return { ...prev, [friendEmail]: true };
+        });
+      }
     }
-  };
+  } catch (error) {
+    console.error("DEBUG: Error checking for new friend messages:", error);
+  }
+};
 
   // Function to check for new group messages
-  const checkForNewGroupMessages = async (lastReadTimestamps) => {
-    if (!userEmail || !lastReadTimestamps) return;
+ const checkForNewGroupMessages = async (lastReadTimestamps) => {
+  if (!userEmail || !lastReadTimestamps) return;
 
-    try {
-      // For each group, check if there are any unread messages
-      for (const groupId of Object.keys(lastReadTimestamps)) {
-        const lastReadTime = lastReadTimestamps[groupId] || 0;
+  try {
+    for (const groupId of Object.keys(lastReadTimestamps)) {
+      const lastReadTime = lastReadTimestamps[groupId] || 0;
 
-        // Skip if we're currently viewing this group chat
-        if (activeSection === "chat" && selectedGroupChat && selectedGroupChat.id === groupId) {
-          console.log(`DEBUG: Skipping unread check for group ${groupId} (currently viewing)`);
-          continue;
-        }
-
-        // Query for messages in this group that are newer than the last read timestamp
-        const { data, error } = await supabase
-          .from("messages")
-          .select("created_at, sender")
-          .eq("recipient", `group:${groupId}`)
-          .eq("type", "groupchat")
-          .gt("created_at", new Date(lastReadTime).toISOString())
-          .neq("sender", userEmail) 
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (error) {
-          console.error(`DEBUG: Error checking for new messages in group ${groupId}:`, error);
-          continue;
-        }
-
-        // If there are unread messages, update the unread state
-        if (data && data.length > 0) {
-          console.log(`DEBUG: Found unread messages in group ${groupId}`);
-
-          // Update the local notification state
-          const newUnreadGroupMessages = {...localUnreadGroupMessages};
-          newUnreadGroupMessages[groupId] = true;
-
-          // This is a direct state update, not using the context
-          setLocalUnreadGroupMessages(newUnreadGroupMessages);
-        }
+      if (activeSection === "chat" && selectedGroupChat && selectedGroupChat.id === groupId) {
+        continue;
       }
-    } catch (error) {
-      console.error("DEBUG: Error checking for new group messages:", error);
+
+      const { data, error } = await supabase
+        .from("messages")
+        .select("created_at, sender")
+        .eq("recipient", `group:${groupId}`)
+        .eq("type", "groupchat")
+        .gt("created_at", new Date(lastReadTime).toISOString())
+        .neq("sender", userEmail) 
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error(`DEBUG: Error checking for new messages in group ${groupId}:`, error);
+        continue;
+      }
+
+      if (data && data.length > 0) {
+        console.log(`DEBUG: Found unread messages in group ${groupId}`);
+        
+        // Only update state if this group doesn't already have unread messages
+        setLocalUnreadGroupMessages(prev => {
+          // If already marked unread, don't update state at all
+          if (prev[groupId] === true) {
+            return prev; // Keep the SAME object reference
+          }
+          return { ...prev, [groupId]: true };
+        });
+      }
     }
-  };
+  } catch (error) {
+    console.error("DEBUG: Error checking for new group messages:", error);
+  }
+};
 
   // Function to refresh pending friend requests
   const refreshPendingRequests = async () => {
