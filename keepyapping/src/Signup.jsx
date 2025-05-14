@@ -10,52 +10,93 @@ const SUPABASE_ANON_KEY =
 
 const supabase = SupabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/**
+ * Signup component
+ *
+ * This component handles user registration for the KeepYapping application.
+ * It collects user information, validates inputs, creates an account in Supabase Auth,
+ * and stores additional user profile information in the database.
+ *
+ * The component includes form validation, duplicate email/username checking,
+ * and password visibility toggles for better user experience.
+ */
 function Signup() {
-  const [name, setName] = useState("");
-  const [bio, setBio] = useState("");
-  const [email, setEmail] = useState("");
-  const [displayname, setDisplayname] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // State variables for form inputs
+  // User's full name
+  const [name, setName] = useState(""); 
+  // User's biography/description
+  const [bio, setBio] = useState(""); 
+  // User's email address used for authentication
+  const [email, setEmail] = useState(""); 
+  // User's display name username
+  const [displayname, setDisplayname] = useState(""); 
+  // User's password
+  const [password, setPassword] = useState(""); 
+  // Password confirmation
+  const [confirmPassword, setConfirmPassword] = useState(""); 
 
+  // State variables for UI feedback
+  // Error messages to display
+  const [error, setError] = useState(""); 
+  // Success messages to display
+  const [message, setMessage] = useState(""); 
+
+  // State variables for password visibility toggles
+  // Toggle for password field
+  const [showPassword, setShowPassword] = useState(false); 
+  // Toggle for confirm password field
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); 
+
+  // Hook for programmatic navigation between routes
   const navigate = useNavigate();
 
+  /**
+   * Handle the signup form submission
+   * This function processes the user registration, including validation and database operations
+   * - The form submission event
+   * @param {Event} e 
+   */
   const handleSignup = async (e) => {
     e.preventDefault();
+    // Reset any previous feedback messages
     setError("");
     setMessage("");
 
+    // Validate that all required fields are filled
     if (!name || !bio || !email || !displayname || !password || !confirmPassword) {
       setError("All fields are required.");
       return;
     }
 
+    // Validate that passwords match
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
     try {
+      // Check if the email is already in use
+      // This prevents duplicate accounts with the same email
       const { data: existingEmail, error: emailCheckError } = await supabase
         .from("users")
         .select("email")
         .eq("email", email)
         .single();
 
+      // Handle database query errors PGRST116 is "no rows returned" which is expected
       if (emailCheckError && emailCheckError.code !== "PGRST116") {
         setError(`Error checking email: ${emailCheckError.message}`);
         return;
       }
 
+      // If email already exists, show error and stop registration
       if (existingEmail) {
         setError("This email is already associated with an account.");
         return;
       }
 
+      // Check if the display name is already taken
+      // This ensures unique usernames across the platform
       const { data: existingDisplayname, error: displaynameCheckError } =
         await supabase
           .from("users")
@@ -63,11 +104,13 @@ function Signup() {
           .eq("displayname", displayname)
           .single();
 
+      // Handle database query errors
       if (displaynameCheckError && displaynameCheckError.code !== "PGRST116") {
         setError(`Error checking display name: ${displaynameCheckError.message}`);
         return;
       }
 
+      // If display name already exists, show error and stop registration
       if (existingDisplayname) {
         setError("This display name is already taken.");
         return;
@@ -75,21 +118,28 @@ function Signup() {
 
       console.log("Signing up user with email:", email);
 
+      // Create the user account in Supabase Auth
+      // This handles the authentication part of the registration
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          // Redirect URL for email confirmation
+          // After confirming email, user will be redirected to login page
           emailRedirectTo: 'https://keep-yapping.netlify.app/login#verified'
         }
       });
 
       console.log("Sign up result, error:", signUpError);
 
+      // Handle signup errors from Supabase Auth
       if (signUpError) {
         setError(`Sign-up failed: ${signUpError.message}`);
         return;
       }
 
+      // Store additional user information in the users table
+      // This includes profile data not stored in the auth system
       const { error: insertError } = await supabase.from("users").insert([
         {
           email,
@@ -99,21 +149,29 @@ function Signup() {
         },
       ]);
 
+      // Handle database insertion errors
       if (insertError) {
         setError(`Failed to save user info: ${insertError.message}`);
         return;
       }
 
+      // Show success message to the user
       setMessage("Account has been created! Please check your email to confirm your account.");
 
+      // Redirect to login page after a short delay
+      // This gives the user time to read the success message
       setTimeout(() => {
         navigate("/login");
       }, 3000);
     } catch (err) {
+      // Catch any unexpected errors during the registration process
       setError(`Unexpected error: ${err.message}`);
     }
   };
 
+  /**
+   * Render the signup form UI
+   */
   return (
     <div
       className="auth-container"
@@ -130,6 +188,7 @@ function Signup() {
         fontFamily: "'Inter', sans-serif",
       }}
     >
+      {/* Main card container for the signup form */}
       <div
         className="auth-card"
         style={{
@@ -145,13 +204,16 @@ function Signup() {
           zIndex: 1,
         }}
       >
+        {/* Header section with title and description */}
         <div className="auth-header" style={{ textAlign: "center", marginBottom: "1rem" }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: "700", color: "#fff" }}>Create an Account</h2>
           <p style={{ color: "#ccc" }}>Join KeepYapping today</p>
         </div>
 
+        {/* Signup form with validation and submission handling */}
         <form className="auth-form" onSubmit={handleSignup}>
 
+          {/* Full Name input field */}
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <label htmlFor="name" style={{ color: "#ccc" }}>Full Name</label>
             <input
@@ -165,6 +227,7 @@ function Signup() {
             />
           </div>
 
+          {/* Display Name input field - this is the username shown to other users */}
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <label htmlFor="displayname" style={{ color: "#ccc" }}>Display Name</label>
             <input
@@ -178,6 +241,7 @@ function Signup() {
             />
           </div>
 
+          {/* Email input field - used for authentication and account recovery */}
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <label htmlFor="email" style={{ color: "#ccc" }}>Email</label>
             <input
@@ -191,6 +255,7 @@ function Signup() {
             />
           </div>
 
+          {/* Bio textarea - allows users to provide a short description about themselves */}
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <label htmlFor="bio" style={{ color: "#ccc" }}>Bio</label>
             <textarea
@@ -203,6 +268,7 @@ function Signup() {
             />
           </div>
 
+          {/* Password input field with visibility toggle */}
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <label htmlFor="password" style={{ color: "#ccc" }}>Password</label>
             <div style={{ position: "relative" }}>
@@ -215,9 +281,11 @@ function Signup() {
                 required
                 style={{
                   ...inputStyle,
-                  paddingRight: "2.5rem" // Make room for the eye icon
+                  // Make room for the eye icon
+                  paddingRight: "2.5rem" 
                 }}
               />
+              {/* Password visibility toggle button */}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -229,14 +297,17 @@ function Signup() {
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  color: "#5865f2", // KeepYapping blue color
-                  fontSize: "1.5rem", // Increased size
+                  // KeepYapping blue color
+                  color: "#5865f2", 
+                  // Increased size
+                  fontSize: "1.5rem", 
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
+                {/* SVG icons for password visibility state */}
                 {showPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" width="1.2em" height="1.2em" fill="currentColor">
                     <path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/>
@@ -250,6 +321,7 @@ function Signup() {
             </div>
           </div>
 
+          {/* Confirm Password input field with visibility toggle */}
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <label htmlFor="confirmPassword" style={{ color: "#ccc" }}>Confirm Password</label>
             <div style={{ position: "relative" }}>
@@ -262,9 +334,11 @@ function Signup() {
                 required
                 style={{
                   ...inputStyle,
-                  paddingRight: "2.5rem" // Make room for the eye icon
+                  // Make room for the eye icon
+                  paddingRight: "2.5rem" 
                 }}
               />
+              {/* Confirm password visibility toggle button */}
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -276,14 +350,17 @@ function Signup() {
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  color: "#5865f2", // KeepYapping blue color
-                  fontSize: "1.5rem", // Increased size
+                  // KeepYapping blue color
+                  color: "#5865f2", 
+                  // Increased size
+                  fontSize: "1.5rem", 
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
+                {/* SVG icons for confirm password visibility state */}
                 {showConfirmPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" width="1.2em" height="1.2em" fill="currentColor">
                     <path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/>
@@ -297,6 +374,7 @@ function Signup() {
             </div>
           </div>
 
+          {/* Submit button for the signup form */}
           <button
             className="auth-button"
             type="submit"
@@ -316,6 +394,7 @@ function Signup() {
             Sign Up
           </button>
 
+          {/* Error message display - only shown when there's an error */}
           {error && (
             <div style={{
               color: "white",
@@ -330,6 +409,7 @@ function Signup() {
             </div>
           )}
 
+          {/* Success message display - only shown after successful signup */}
           {message && (
             <div style={{
               color: "white",
@@ -345,6 +425,7 @@ function Signup() {
           )}
         </form>
 
+        {/* Footer with link to login page */}
         <div className="auth-footer" style={{ textAlign: "center", marginTop: "1rem" }}>
           <p style={{ color: "#aaa", fontSize: "0.9rem" }}>
             Already have an account?{" "}
@@ -355,7 +436,7 @@ function Signup() {
         </div>
       </div>
 
-      {/* Animation keyframes */}
+      {/* Animation keyframes for fade-in effect when component loads */}
       <style>
         {`
           @keyframes fadeIn {
@@ -368,6 +449,11 @@ function Signup() {
   );
 }
 
+/**
+ * Common input field styling
+ * This object defines the shared styles for all input fields in the form
+ * Extracted to avoid repetition and maintain consistency
+ */
 const inputStyle = {
   width: "100%",
   padding: "0.75rem",
@@ -378,4 +464,5 @@ const inputStyle = {
   fontSize: "1rem",
 };
 
+// Export the component for use in the application's routing
 export default Signup;
