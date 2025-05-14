@@ -870,7 +870,11 @@ function HomePage({ onLogout }) {
           newUnreadFriendMessages[friendEmail] = true;
 
           // This is a direct state update, not using the context
-          setLocalUnreadFriendMessages(newUnreadFriendMessages);
+          setLocalUnreadFriendMessages(prev => ({
+            ...prev,
+            [friendEmail]: true
+          }));
+
         }
       }
     } catch (error) {
@@ -918,7 +922,10 @@ function HomePage({ onLogout }) {
           newUnreadGroupMessages[groupId] = true;
 
           // This is a direct state update, not using the context
-          setLocalUnreadGroupMessages(newUnreadGroupMessages);
+            setLocalUnreadGroupMessages(prev => ({
+              ...prev,
+              [groupId]: true
+            }));
         }
       }
     } catch (error) {
