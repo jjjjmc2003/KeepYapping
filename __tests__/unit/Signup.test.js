@@ -32,7 +32,7 @@ describe('Signup Component Tests', () => {
 
   // Test to Verify display name validation
   test('validates display name is not empty', () => {
-    // Hardcoded test for display name validation
+    // test for display name validation
     const validDisplayName = "TestUser";
     const emptyDisplayName = "";
 
