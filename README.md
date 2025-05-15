@@ -53,7 +53,6 @@ A social media web application that allows users to connect and communicate.
    npm start
    ```
 
-4. Open terminal and run npm start to view the app in your browser
 
 ## Project Structure
 
