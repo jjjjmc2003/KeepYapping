@@ -152,7 +152,7 @@ export const NotificationProvider = ({ children }) => {
     const init = async () => {
       console.log("Initializing notification system for user:", user.email);
 
-      // 1. Get friends I can DM with their profile information
+      // Get friends I can DM with their profile information
       try {
         // First get the friend requests that have been accepted
         const { data: fr, error: frError } = await supabase
